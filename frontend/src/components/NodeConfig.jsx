@@ -1,4 +1,6 @@
 import { typeLabel } from '../catalog.js'
+import { PARAMS } from '../constants.js'
+import ConditionsEditor from './ConditionsEditor.jsx'
 
 function Field({ label, children }) {
   return (
@@ -9,7 +11,30 @@ function Field({ label, children }) {
   )
 }
 
-export default function NodeConfig({ node, catalog, agents, onLabel, onChangeAgent }) {
+export default function NodeConfig({ node, catalog, agents, onLabel, onChangeAgent, onConditions }) {
+  if (node.data.kind === 'decision') {
+    // Branch on input columns or on any agent's output variables.
+    const outputVars = [
+      ...new Set((agents || []).flatMap((a) => a.agent_metadata?.output_variables || [])),
+    ]
+    const params = [...PARAMS, ...outputVars]
+    return (
+      <div className="config">
+        <div className="config__role">Decision</div>
+        <p className="muted">
+          The node's label is its consolidated condition. It routes via its two
+          outputs: <b>True</b> (bottom) and <b>False</b> (right).
+        </p>
+        <ConditionsEditor
+          conditions={node.data.conditions || []}
+          match={node.data.match || 'all'}
+          params={params}
+          onChange={onConditions}
+        />
+      </div>
+    )
+  }
+
   if (node.data.kind === 'leaf') {
     return (
       <div className="config">

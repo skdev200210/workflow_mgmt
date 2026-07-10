@@ -1,6 +1,19 @@
 import { Handle, Position } from '@xyflow/react'
 
 function ViewNode({ data, selected }) {
+  if (data.nodeType === 'decision') {
+    return (
+      <div className={`diamond-wrap ${selected ? 'diamond-wrap--selected' : ''}`}>
+        <Handle type="target" position={Position.Top} />
+        <div className="diamond-shape" />
+        <div className="diamond-label">{data.label}</div>
+        <Handle type="source" id="true" position={Position.Bottom} className="handle-true" />
+        <Handle type="source" id="false" position={Position.Right} className="handle-false" />
+        <span className="diamond-tag diamond-tag--true">T</span>
+        <span className="diamond-tag diamond-tag--false">F</span>
+      </div>
+    )
+  }
   const isAgent = data.nodeType === 'execute_agent'
   const icon = isAgent ? '⚙' : data.role === 'start' ? '▶' : data.role === 'end' ? '⏹' : '◻'
   return (

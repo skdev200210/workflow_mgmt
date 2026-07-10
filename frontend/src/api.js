@@ -74,11 +74,10 @@ export function getAgent(settings, agentId) {
   return apiFetch(settings, `/agents/${agentId}`)
 }
 
-import { availableParams } from './catalog.js'
-
 // --- condition completeness -------------------------------------------------- #
 // A single condition is complete when it has param + op + a value. Booleans are
-// always "present" (false is valid); other types must be non-empty.
+// always "present" (false is valid); other types must be non-empty. (Used by
+// decision nodes — edges carry no conditions.)
 export function conditionComplete(c) {
   if (!c || !c.param || !c.op) return false
   if (c.valueType === 'boolean') {
@@ -87,13 +86,12 @@ export function conditionComplete(c) {
   return c.value !== '' && c.value !== null && c.value !== undefined
 }
 
-// An edge is complete when every present condition is complete, AND it has at
-// least one condition whenever its source node exposes params to branch on.
-// (A source with no params — e.g. a message agent — may be unconditional.)
+// Edges carry no conditions. From a decision node, a True/False branch must be
+// chosen; every other edge is unconditional (always complete).
 export function edgeComplete(edge, sourceNode) {
-  const conds = edge.data?.conditions || []
-  if (conds.some((c) => !conditionComplete(c))) return false
-  if (availableParams(sourceNode).length > 0 && conds.length === 0) return false
+  if (sourceNode?.data?.kind === 'decision') {
+    return edge.data?.branch === true || edge.data?.branch === false
+  }
   return true
 }
 
@@ -136,30 +134,44 @@ export async function saveWorkflow(settings, { name, nodes, edges, callingConfig
     )
   }
 
-  // Group edges by source node and assemble the nodes map.
+  const toCond = (c) => ({ param: c.param, op: c.op, value: coerceValue(c.value, c.valueType) })
+
+  // Assemble the nodes map (agent / decision / leaf).
   const nodesDef = {}
   for (const node of nodes) {
-    const isAgent = node.data.kind === 'agent'
-    nodesDef[node.id] = {
-      type: isAgent ? 'execute_agent' : 'leaf_node',
-      label: node.data.label,
-      node_config: isAgent ? { agent_id: node.data.agentId } : {},
-      edges: [],
+    const kind = node.data.kind
+    if (kind === 'decision') {
+      const conds = node.data.conditions || []
+      if (!conds.length || conds.some((c) => !conditionComplete(c))) {
+        throw new Error(`Decision "${node.data.label}" needs at least one complete condition.`)
+      }
+      nodesDef[node.id] = {
+        type: 'decision',
+        label: node.data.label,
+        match: node.data.match || 'all',
+        conditions: conds.map(toCond),
+        node_config: {},
+        edges: [],
+      }
+    } else if (kind === 'agent') {
+      nodesDef[node.id] = {
+        type: 'execute_agent',
+        label: node.data.label,
+        node_config: { agent_id: node.data.agentId },
+        edges: [],
+      }
+    } else {
+      nodesDef[node.id] = { type: 'leaf_node', label: node.data.label, node_config: {}, edges: [] }
     }
   }
+
   for (const edge of edges) {
     if (!nodesDef[edge.target] || !nodesDef[edge.source]) continue
-    const conds = edge.data?.conditions || []
-    nodesDef[edge.source].edges.push({
-      id: edge.id,
-      target: edge.target,
-      match: edge.data?.match || 'all',
-      conditions: conds.map((c) => ({
-        param: c.param,
-        op: c.op,
-        value: coerceValue(c.value, c.valueType),
-      })),
-    })
+    if (nodeById[edge.source]?.data.kind === 'decision') {
+      nodesDef[edge.source].edges.push({ id: edge.id, target: edge.target, branch: edge.data?.branch })
+    } else {
+      nodesDef[edge.source].edges.push({ id: edge.id, target: edge.target })
+    }
   }
 
   // 3. Build and POST the workflow definition.

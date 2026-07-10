@@ -41,5 +41,22 @@ export function LeafNode({ data, selected }) {
   )
 }
 
+export function DecisionNode({ data, selected }) {
+  // Two dedicated outputs: True (bottom) and False (right). The branch is set by
+  // which handle an edge is drawn from. Handles sit on the wrapper (not the
+  // clip-path shape) so they aren't clipped.
+  return (
+    <div className={`diamond-wrap ${selected ? 'diamond-wrap--selected' : ''}`}>
+      <Handle type="target" position={Position.Top} />
+      <div className="diamond-shape" />
+      <div className="diamond-label">{data.label}</div>
+      <Handle type="source" id="true" position={Position.Bottom} className="handle-true" />
+      <Handle type="source" id="false" position={Position.Right} className="handle-false" />
+      <span className="diamond-tag diamond-tag--true">T</span>
+      <span className="diamond-tag diamond-tag--false">F</span>
+    </div>
+  )
+}
+
 // Stable reference — required by React Flow (do not recreate each render).
-export const nodeTypes = { agent: AgentNode, leaf: LeafNode }
+export const nodeTypes = { agent: AgentNode, leaf: LeafNode, decision: DecisionNode }

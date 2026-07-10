@@ -26,6 +26,7 @@ import {
   listAgents,
 } from './api.js'
 import { agentPreview, categoryForType, typeLabel } from './catalog.js'
+import { decisionLabel } from './conditionText.js'
 
 let idCounter = 0
 const nextId = (kind) => `${kind}_${Date.now()}_${++idCounter}`
@@ -51,14 +52,6 @@ function agentNodeData(catalog, agent) {
     outputVariables: agent.agent_metadata?.output_variables || [],
     label,
   }
-}
-
-function conditionsLabel(conditions, match) {
-  const parts = (conditions || [])
-    .filter((c) => c.param && c.op)
-    .map((c) => `${c.param} ${c.op} ${c.value}`)
-  if (!parts.length) return undefined
-  return parts.join(match === 'any' ? ' OR ' : ' AND ')
 }
 
 export default function App() {
@@ -112,14 +105,19 @@ export default function App() {
   )
 
   const onConnect = useCallback(
-    (params) =>
-      setEdges((eds) =>
-        addEdge(
-          { ...params, id: nextId('edge'), type: 'step', data: { conditions: [], match: 'all' } },
-          eds,
-        ),
-      ),
-    [setEdges],
+    (params) => {
+      const src = nodes.find((n) => n.id === params.source)
+      let data = {}
+      let label
+      if (src?.data.kind === 'decision') {
+        // The branch is set by which output (True/False handle) you dragged from.
+        const branch = params.sourceHandle !== 'false'
+        data = { branch }
+        label = branch ? 'True' : 'False'
+      }
+      setEdges((eds) => addEdge({ ...params, id: nextId('edge'), type: 'step', data, label }, eds))
+    },
+    [setEdges, nodes],
   )
 
   const addAgentNode = useCallback(
@@ -139,6 +137,37 @@ export default function App() {
     setSelected({ type: 'node', id })
   }, [setNodes])
 
+  const addDecisionNode = useCallback(() => {
+    const id = nextId('decision')
+    const position = { x: 120 + Math.random() * 360, y: 160 + Math.random() * 160 }
+    setNodes((nds) =>
+      nds.concat({
+        id,
+        type: 'decision',
+        position,
+        data: {
+          kind: 'decision',
+          label: decisionLabel([], 'all'),
+          match: 'all',
+          conditions: [],
+        },
+      }),
+    )
+    setSelected({ type: 'node', id })
+  }, [setNodes])
+
+  const updateNodeConditions = useCallback(
+    (id, conditions, match) =>
+      setNodes((nds) =>
+        nds.map((n) =>
+          n.id === id
+            ? { ...n, data: { ...n.data, conditions, match, label: decisionLabel(conditions, match) } }
+            : n,
+        ),
+      ),
+    [setNodes],
+  )
+
   const updateLabel = useCallback(
     (id, label) =>
       setNodes((nds) => nds.map((n) => (n.id === id ? { ...n, data: { ...n.data, label } } : n))),
@@ -157,17 +186,6 @@ export default function App() {
     [setNodes, catalog],
   )
 
-  const updateConditions = useCallback(
-    (edgeId, conditions, match) =>
-      setEdges((eds) =>
-        eds.map((e) =>
-          e.id === edgeId
-            ? { ...e, data: { ...e.data, conditions, match }, label: conditionsLabel(conditions, match) }
-            : e,
-        ),
-      ),
-    [setEdges],
-  )
 
   const deleteSelected = useCallback(
     (sel) => {
@@ -222,6 +240,7 @@ export default function App() {
             catalog={catalog}
             agents={agents}
             onAddAgent={addAgentNode}
+            onAddDecision={addDecisionNode}
             onAddLeaf={addLeafNode}
             onSave={handleSave}
             saving={saving}
@@ -266,7 +285,7 @@ export default function App() {
               agents={agents}
               onLabel={updateLabel}
               onChangeAgent={changeNodeAgent}
-              onConditions={updateConditions}
+              onNodeConditions={updateNodeConditions}
               onDelete={deleteSelected}
             />
           </div>

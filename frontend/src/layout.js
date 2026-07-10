@@ -7,17 +7,12 @@ import dagre from '@dagrejs/dagre'
 
 const AGENT_SIZE = { width: 210, height: 92 }
 const LEAF_SIZE = { width: 160, height: 56 }
-
-function conditionsLabel(conditions, match) {
-  const parts = (conditions || [])
-    .filter((c) => c.param && c.op)
-    .map((c) => `${c.param} ${c.op} ${c.value}`)
-  if (!parts.length) return undefined
-  return parts.join(match === 'any' ? ' OR ' : ' AND ')
-}
+const DECISION_SIZE = { width: 160, height: 104 }
 
 function nodeSize(node) {
-  return node.data.nodeType === 'execute_agent' ? AGENT_SIZE : LEAF_SIZE
+  if (node.data.nodeType === 'execute_agent') return AGENT_SIZE
+  if (node.data.nodeType === 'decision') return DECISION_SIZE
+  return LEAF_SIZE
 }
 
 export function definitionToFlow(definition) {
@@ -43,6 +38,8 @@ export function definitionToFlow(definition) {
         label: node.label,
         role,
         agentId: node.node_config?.agent_id,
+        conditions: node.conditions, // decision nodes
+        match: node.match,
       },
     }
   })
@@ -51,12 +48,14 @@ export function definitionToFlow(definition) {
   for (const id of allIds) {
     for (const e of nodesDef[id].edges || []) {
       if (!nodesDef[e.target]) continue
+      const isBranch = e.branch === true || e.branch === false
       edges.push({
         id: e.id || `${id}->${e.target}`,
         source: id,
         target: e.target,
-        label: conditionsLabel(e.conditions, e.match),
-        data: { conditions: e.conditions || [], match: e.match || 'all' },
+        sourceHandle: isBranch ? (e.branch ? 'true' : 'false') : undefined,
+        label: isBranch ? (e.branch ? 'True' : 'False') : undefined,
+        data: { branch: e.branch },
       })
     }
   }

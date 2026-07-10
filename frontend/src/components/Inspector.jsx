@@ -1,6 +1,5 @@
 import NodeConfig from './NodeConfig.jsx'
 import EdgeConfig from './EdgeConfig.jsx'
-import { availableParams } from '../catalog.js'
 
 export default function Inspector({
   selected,
@@ -10,7 +9,7 @@ export default function Inspector({
   agents,
   onLabel,
   onChangeAgent,
-  onConditions,
+  onNodeConditions,
   onDelete,
 }) {
   if (!selected) {
@@ -19,9 +18,9 @@ export default function Inspector({
         <div className="inspector__empty">
           Select a node or an edge to configure it.
           <ul>
-            <li>Add agent nodes from the toolbar (they reference agents from the Agents tab).</li>
+            <li>Add agent nodes and decision (◆) nodes from the toolbar.</li>
             <li>Drag from a node's bottom dot to another node to create an edge.</li>
-            <li>Click an edge to set its condition (column / operator / value).</li>
+            <li>Click an edge to set its condition, or (from a decision) its True/False branch.</li>
           </ul>
         </div>
       </aside>
@@ -37,9 +36,7 @@ export default function Inspector({
         <div className="inspector__head">
           <h3>Node: {node.data.label}</h3>
           {canDelete && (
-            <button className="btn btn--danger" onClick={() => onDelete(selected)}>
-              Delete
-            </button>
+            <button className="btn btn--danger" onClick={() => onDelete(selected)}>Delete</button>
           )}
         </div>
         <NodeConfig
@@ -48,6 +45,7 @@ export default function Inspector({
           agents={agents}
           onLabel={(v) => onLabel(node.id, v)}
           onChangeAgent={(agent) => onChangeAgent(node.id, agent)}
+          onConditions={(conds, match) => onNodeConditions(node.id, conds, match)}
         />
       </aside>
     )
@@ -56,20 +54,13 @@ export default function Inspector({
   const edge = edges.find((e) => e.id === selected.id)
   if (!edge) return null
   const sourceNode = nodes.find((n) => n.id === edge.source)
-  const params = availableParams(sourceNode)
   return (
     <aside className="inspector">
       <div className="inspector__head">
-        <h3>Edge conditions</h3>
-        <button className="btn btn--danger" onClick={() => onDelete(selected)}>
-          Delete
-        </button>
+        <h3>Edge</h3>
+        <button className="btn btn--danger" onClick={() => onDelete(selected)}>Delete</button>
       </div>
-      <EdgeConfig
-        edge={edge}
-        params={params}
-        onConditions={(conds, match) => onConditions(edge.id, conds, match)}
-      />
+      <EdgeConfig edge={edge} sourceKind={sourceNode?.data.kind} />
     </aside>
   )
 }

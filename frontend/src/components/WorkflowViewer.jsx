@@ -17,26 +17,29 @@ function DetailPanel({ detail }) {
   if (!detail) {
     return <div className="muted">Click a node or edge to see its details.</div>
   }
-  if (detail.kind === 'edge') {
-    const conds = detail.edge.data?.conditions || []
-    const match = detail.edge.data?.match || 'all'
+  if (detail.kind === 'decision') {
+    const { conditions = [], match = 'all', label } = detail.node.data
     return (
       <div className="config">
-        <h4>Edge conditions</h4>
-        {conds.length === 0 ? (
-          <div className="config__preview">always (unconditional)</div>
-        ) : (
-          <>
-            {conds.length > 1 && (
-              <div className="muted">Match: {match === 'any' ? 'Any (OR)' : 'All (AND)'}</div>
-            )}
-            {conds.map((c, i) => (
-              <div key={i} className="config__preview">
-                {`${c.param} ${c.op} ${JSON.stringify(c.value)}`}
-              </div>
-            ))}
-          </>
+        <h4>{label}</h4>
+        <div className="muted">decision</div>
+        {conditions.length > 1 && (
+          <div className="muted">Match: {match === 'any' ? 'Any (OR)' : 'All (AND)'}</div>
         )}
+        {conditions.map((c, i) => (
+          <div key={i} className="config__preview">{`${c.param} ${c.op} ${JSON.stringify(c.value)}`}</div>
+        ))}
+      </div>
+    )
+  }
+  if (detail.kind === 'edge') {
+    const b = detail.edge.data?.branch
+    return (
+      <div className="config">
+        <h4>Edge</h4>
+        <div className="config__preview">
+          {b === true ? 'True branch' : b === false ? 'False branch' : 'unconditional'}
+        </div>
       </div>
     )
   }
@@ -132,6 +135,10 @@ export default function WorkflowViewer({ settings }) {
 
   const onNodeClick = useCallback(
     async (_, node) => {
+      if (node.data.nodeType === 'decision') {
+        setDetail({ kind: 'decision', node })
+        return
+      }
       const agentId = node.data.agentId
       if (node.data.nodeType === 'execute_agent' && agentId) {
         let agent = agentCache[agentId]

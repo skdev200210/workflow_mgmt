@@ -8,6 +8,7 @@ export default function Toolbar({
   catalog,
   agents,
   onAddAgent,
+  onAddDecision,
   onAddLeaf,
   onSave,
   saving,
@@ -87,6 +88,7 @@ export default function Toolbar({
             )
           })()}
 
+        <button className="btn" onClick={onAddDecision}>◆ Decision</button>
         <button className="btn btn--ghost" onClick={onAddLeaf}>+ Leaf</button>
         <button className="btn btn--ghost" onClick={() => setShowSettings((s) => !s)}>⚙ Settings</button>
         <button className="btn btn--primary" onClick={onSave} disabled={saving || !catalog}>

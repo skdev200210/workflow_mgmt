@@ -113,6 +113,32 @@ details > summary::-webkit-details-marker { display: none; }
 .agents__editor { flex: 1; min-width: 0; padding: 16px; overflow-y: auto; }
 .inspector__head > div { display: flex; gap: 6px; }
 
+/* Decision diamond node (handles on the wrapper so they aren't clipped) */
+.diamond-wrap { position: relative; width: 160px; height: 104px; }
+.diamond-shape {
+  position: absolute; inset: 0; background: #efe3ff;
+  clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%);
+}
+.diamond-wrap--selected .diamond-shape { background: #dcc7fb; }
+.diamond-label {
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+  text-align: center; padding: 0 30px; font-size: 10px; font-weight: 600; color: #4b2a72;
+  overflow: hidden;
+}
+/* Colored True/False output handles + tags */
+.diamond-wrap .react-flow__handle.handle-true { background: #12a150; }
+.diamond-wrap .react-flow__handle.handle-false { background: #e0483d; }
+.diamond-tag { position: absolute; font-size: 9px; font-weight: 700; pointer-events: none; }
+.diamond-tag--true { bottom: -14px; left: 50%; transform: translateX(-50%); color: #12a150; }
+.diamond-tag--false { right: -14px; top: 50%; transform: translateY(-50%); color: #e0483d; }
+
+/* Read-only branch tag in the edge inspector */
+.branch-tag {
+  display: inline-block; border-radius: 999px; padding: 4px 12px; font-size: 12px; font-weight: 600;
+}
+.branch-tag--true { background: #e7f6ec; color: #12a150; }
+.branch-tag--false { background: #fdecea; color: #b3261e; }
+
 /* Edge condition rows */
 .cond-row {
   border: 1px solid #e2e5ea; border-radius: 8px; padding: 8px; display: flex;
