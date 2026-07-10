@@ -8,6 +8,7 @@ from pydantic import ValidationError
 
 from app.api.agent_types import router as agent_types_router
 from app.api.agents import router as agents_router
+from app.api.callbacks import router as callbacks_router
 from app.api.executions import router as executions_router
 from app.api.workflows import router as workflows_router
 from app.core.config import get_settings
@@ -51,6 +52,7 @@ app.include_router(agent_types_router)
 app.include_router(agents_router)
 app.include_router(workflows_router)
 app.include_router(executions_router)
+app.include_router(callbacks_router)
 
 
 @app.get("/health", tags=["health"])
