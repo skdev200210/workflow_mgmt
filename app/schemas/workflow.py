@@ -26,12 +26,10 @@ class Edge(BaseModel):
     # Optional legacy/safety-net agent reference; the canonical reference for an
     # execute_agent node lives in node_config.agent_id.
     agent_id: uuid.UUID | None = None
-    # An edge may carry multiple conditions, combined by ``match``:
-    #   "all" -> every condition must hold (AND), "any" -> at least one (OR).
-    # An empty list means unconditional (always) — used when the source node
-    # exposes no variables to branch on (e.g. a message agent with no outputs).
-    match: Literal["all", "any"] = "all"
-    conditions: list[Condition] = Field(default_factory=list)
+    # Edges carry NO conditions — all branching happens at decision nodes.
+    # ``branch`` is set on edges LEAVING a decision node (which outcome this
+    # edge represents); other nodes have a single, unconditional outgoing edge.
+    branch: bool | None = None
 
 
 # --------------------------------------------------------------------------- #
@@ -64,8 +62,39 @@ class ExecuteAgentNode(BaseModel):
     edges: list[Edge] = Field(default_factory=list)
 
 
+class DecisionNode(BaseModel):
+    """A flowchart diamond: evaluate ``conditions`` (combined by ``match``) to a
+    single True/False, then route via the outgoing edge whose ``branch`` matches.
+    Lets you chain if/elif/else without repeating conditions on every edge.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    type: Literal["decision"]
+    label: str
+    node_config: dict[str, Any] = Field(default_factory=dict)
+    match: Literal["all", "any"] = "all"
+    conditions: list[Condition] = Field(..., min_length=1)
+    input_data: str | None = None
+    edges: list[Edge] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def _check_branches(self) -> "DecisionNode":
+        branches = [e.branch for e in self.edges]
+        if any(b is None for b in branches):
+            raise ValueError(
+                "every edge from a decision node must set branch (true/false)."
+            )
+        if len(set(branches)) != len(branches):
+            raise ValueError(
+                "a decision node's edges must have distinct branches "
+                "(at most one true and one false)."
+            )
+        return self
+
+
 WorkflowNode = Annotated[
-    Union[LeafNode, ExecuteAgentNode], Field(discriminator="type")
+    Union[LeafNode, ExecuteAgentNode, DecisionNode], Field(discriminator="type")
 ]
 
 
