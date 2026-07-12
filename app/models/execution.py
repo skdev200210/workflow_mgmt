@@ -8,10 +8,8 @@ from sqlalchemy import (
     Identity,
     Index,
     Integer,
-    SmallInteger,
     String,
     Text,
-    text,
 )
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
@@ -20,7 +18,20 @@ from app.db.base import Base, TimestampMixin
 
 
 class WorkflowExecution(Base, TimestampMixin):
-    """One row per workflow run (a customer/phone going through one workflow)."""
+    """One row per workflow run — this table IS the work queue.
+
+    A seeder inserts one row per input CSV row (``input_file_row_json``),
+    pointed at the workflow's start node. The worker claims due ``pending``
+    rows and dispatches ``executable_node_id`` (resolving through any chain of
+    decision nodes inline — decision nodes are never persisted here). Provider
+    callbacks advance the row in place to the next agent node or complete it.
+
+    ``context`` is the effective run context: it starts as a copy of the input
+    row and accumulates callback outputs; decision conditions evaluate against
+    it. ``input_file_row_json`` stays pristine as the audit copy.
+    ``callback_payloads`` stores every callback received for this run, keyed by
+    agent_execution_id (a list per key, so duplicates are kept too).
+    """
 
     __tablename__ = "workflow_execution"
 
@@ -31,53 +42,33 @@ class WorkflowExecution(Base, TimestampMixin):
     workflow_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
     client_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
     customer_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
-    phone_number: Mapped[str | None] = mapped_column(String(20))
-    status: Mapped[str] = mapped_column(String(20), nullable=False, default="running")
-    context: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, default=dict)
-    current_summary: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
-    parent_workflow_execution_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
-    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    error: Mapped[str | None] = mapped_column(Text)
 
-
-class WorkflowQueue(Base, TimestampMixin):
-    """The work/scheduling table. A worker claims due rows and processes them."""
-
-    __tablename__ = "workflow_queue"
-
-    row_id: Mapped[int] = mapped_column(BigInteger, Identity(), primary_key=True)
-    workflow_execution_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
-    workflow_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
-    client_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
-    customer_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
-    phone_number: Mapped[str | None] = mapped_column(String(20))
-
-    node_id: Mapped[str] = mapped_column(String(128), nullable=False)
-    node_type: Mapped[str] = mapped_column(String(32), nullable=False)
-    agent_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
-    executable_node: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False)
-    node_metadata: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
-    context: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, default=dict)
-
+    # pending -> processing -> in_flight -> (pending again on advance/retry)
+    # terminal: completed | failed | dead_letter
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="pending")
-    attempt: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
-    max_attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
-    priority: Mapped[int] = mapped_column(SmallInteger, nullable=False, default=0)
-    result: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
+    # The node the worker should trigger next. Always the start node or an
+    # execute_agent node — decisions are resolved inline, never stored.
+    executable_node_id: Mapped[str | None] = mapped_column(String(128))
 
-    source_node_id: Mapped[str | None] = mapped_column(String(128))
-    source_edge_id: Mapped[str | None] = mapped_column(String(128))
+    input_file_row_json: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, default=dict)
+    context: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, default=dict)
+    callback_payloads: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, default=dict)
 
     last_triggered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     next_trigger_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    execution_timeout_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    parent_workflow_execution_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    max_attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=3)
     error: Mapped[str | None] = mapped_column(Text)
 
 
 class AgentExecution(Base, TimestampMixin):
-    """One row per agent fire — the durable per-call/message history."""
+    """One row per agent fire — the durable per-call/message history.
+
+    ``agent_execution_id`` is the callback correlation id: the provider echoes
+    it back so the callback can find this receipt, and through
+    ``workflow_execution_id`` the run to advance. ``node_id`` + ``attempt``
+    let a late callback for an old fire be detected as stale.
+    """
 
     __tablename__ = "agent_execution"
 
@@ -86,18 +77,32 @@ class AgentExecution(Base, TimestampMixin):
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
     workflow_execution_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
-    workflow_queue_row_id: Mapped[int | None] = mapped_column(BigInteger)
-    node_id: Mapped[str] = mapped_column(String(128), nullable=False)
     agent_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
-    agent_type: Mapped[str] = mapped_column(String(32), nullable=False)
+    node_id: Mapped[str] = mapped_column(String(128), nullable=False)
     attempt: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
 
-    input_context: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
-    request_payload: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
-    result: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
-    output_variables: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
-    status: Mapped[str] = mapped_column(String(20), nullable=False, default="executed")
+    # What was (or would be) sent to the provider: run context + rendered request.
+    input_payload: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
+    # The provider's callback, verbatim.
+    output_payload: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
+    # dispatched -> callback_received | failed | stale | timed_out
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="dispatched")
 
-    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    duration_ms: Mapped[int | None] = mapped_column(Integer)
+
+# --------------------------------------------------------------------------- #
+# Indexes — declared with ORM column expressions (registered on Base.metadata).
+# --------------------------------------------------------------------------- #
+# Hot claim scan: only rows still waiting to run.
+Index(
+    "ix_execution_due",
+    WorkflowExecution.next_trigger_at,
+    postgresql_where=(WorkflowExecution.status == "pending"),
+)
+# Sweeper scan: in_flight rows whose callback never arrived (timeout is derived
+# as last_triggered_at + dispatch_timeout_seconds).
+Index(
+    "ix_execution_inflight",
+    WorkflowExecution.last_triggered_at,
+    postgresql_where=(WorkflowExecution.status == "in_flight"),
+)
+Index("ix_agentexec_execution", AgentExecution.workflow_execution_id)

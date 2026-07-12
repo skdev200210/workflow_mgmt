@@ -9,8 +9,8 @@ class CallbackPayload(BaseModel):
     """One callback shape for ALL external services (calling + messaging).
 
     ``agent_execution_id`` is the correlation id we issue at dispatch time — the
-    provider must echo it back; it uniquely identifies the queue row, the node,
-    and the specific attempt (so duplicate/late callbacks are detected safely).
+    provider must echo it back; it uniquely identifies the run, the node, and
+    the specific attempt (so duplicate/late callbacks are detected safely).
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -38,8 +38,7 @@ class CallbackPayload(BaseModel):
 class CallbackResponse(BaseModel):
     processed: bool
     reason: str | None = None
-    row_id: int | None = None
     workflow_execution_id: uuid.UUID | None = None
-    row_status: str | None = None
-    node_id: str | None = None
+    status: str | None = None
+    executable_node_id: str | None = None
     next_trigger_at: datetime | None = None

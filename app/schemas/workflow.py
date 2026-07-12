@@ -1,4 +1,6 @@
+import copy
 import uuid
+from collections import deque
 from datetime import datetime
 from typing import Annotated, Any, Literal, Union
 
@@ -60,6 +62,13 @@ class ExecuteAgentNode(BaseModel):
     node_config: ExecuteAgentConfig
     input_data: str | None = None
     edges: list[Edge] = Field(default_factory=list)
+    # DERIVED at save time by the backend (the frontend does not send this):
+    # the flattened stack of decision conditions required to reach this node,
+    # each entry ``{"key": ..., "operator": ..., "value": ...}`` combined with
+    # AND. False branches are stored with the operator inverted. A branch that
+    # cannot flatten to AND (e.g. the False side of a multi-condition ALL
+    # group) is kept as one nested ``{"match": "any", "conditions": [...]}``.
+    stacked_conditions: list[dict[str, Any]] | None = None
 
 
 class DecisionNode(BaseModel):
@@ -74,7 +83,10 @@ class DecisionNode(BaseModel):
     label: str
     node_config: dict[str, Any] = Field(default_factory=dict)
     match: Literal["all", "any"] = "all"
-    conditions: list[Condition] = Field(..., min_length=1)
+    # Exactly ONE condition per decision — compound logic is expressed by
+    # STACKING decision nodes, which also keeps every derived
+    # stacked_conditions list flat.
+    conditions: list[Condition] = Field(..., min_length=1, max_length=1)
     input_data: str | None = None
     edges: list[Edge] = Field(default_factory=list)
 
@@ -142,6 +154,97 @@ def collect_agent_ids(definition: WorkflowDefinition) -> set[uuid.UUID]:
             if edge.agent_id is not None:
                 ids.add(edge.agent_id)
     return ids
+
+
+# --------------------------------------------------------------------------- #
+# Stacked-condition derivation (backend-side; the frontend JSON is unchanged)
+# --------------------------------------------------------------------------- #
+_INVERT_OP = {">": "<=", "<": ">=", ">=": "<", "<=": ">", "==": "!=", "!=": "=="}
+
+
+def _flat_condition(cond: dict[str, Any], *, invert: bool) -> dict[str, Any]:
+    """Normalize a decision condition to ``{key, operator, value}``; a False
+    branch inverts the operator (``is`` inverts the boolean value instead)."""
+    op = cond["op"]
+    value = cond["value"]
+    if invert:
+        if op == "is":
+            value = not bool(value)
+        else:
+            op = _INVERT_OP[op]
+    return {"key": cond["param"], "operator": op, "value": value}
+
+
+def _branch_conditions(node: dict[str, Any], branch: bool) -> list[dict[str, Any]]:
+    """The conditions implied by taking ``branch`` out of a decision node."""
+    conds = node.get("conditions", [])
+    match = node.get("match", "all")
+    if len(conds) == 1:
+        return [_flat_condition(conds[0], invert=not branch)]
+    # Flat AND list is expressible for: True of an ALL group, False of an ANY
+    # group (NOT(A OR B) == NOT A AND NOT B).
+    if (branch and match == "all") or (not branch and match == "any"):
+        return [_flat_condition(c, invert=not branch) for c in conds]
+    # True of an ANY group / False of an ALL group are OR-shaped — keep them as
+    # one nested group instead of silently storing wrong semantics.
+    return [{
+        "match": "any",
+        "conditions": [_flat_condition(c, invert=not branch) for c in conds],
+    }]
+
+
+def compute_stacked_conditions(definition: dict[str, Any]) -> dict[str, list[dict[str, Any]]]:
+    """For every reachable execute_agent node: the flattened stack of ALL
+    decision conditions (AND-combined) on the path from workflow_start to it —
+    accumulated straight through any agent nodes in between.
+
+    Walks the graph from workflow_start (BFS, first visit wins — cycle-safe).
+    """
+    nodes = definition["nodes"]
+    acc: dict[str, list[dict[str, Any]]] = {}
+    visited: set[str] = set()
+    queue: deque[tuple[str, list[dict[str, Any]]]] = deque(
+        [(definition["workflow_start"], [])]
+    )
+    while queue:
+        node_id, stacked = queue.popleft()
+        if node_id in visited:
+            continue
+        visited.add(node_id)
+        node = nodes[node_id]
+        node_type = node.get("type")
+        if node_type == "execute_agent":
+            acc[node_id] = stacked
+            for edge in node.get("edges", [])[:1]:
+                queue.append((edge["target"], stacked))  # keep accumulating
+        elif node_type == "decision":
+            for edge in node.get("edges", []):
+                if edge.get("branch") is None:
+                    continue
+                queue.append(
+                    (edge["target"], stacked + _branch_conditions(node, edge["branch"]))
+                )
+        else:  # leaf: single unconditional edge
+            for edge in node.get("edges", [])[:1]:
+                queue.append((edge["target"], stacked))
+    return acc
+
+
+def attach_stacked_conditions(definition: dict[str, Any]) -> dict[str, Any]:
+    """Return a copy of the definition with ``stacked_conditions`` set on every
+    reachable execute_agent node (and stale values removed from unreachable
+    ones). Applied by the CRUD layer on create/update — the frontend keeps
+    sending the same JSON."""
+    enriched = copy.deepcopy(definition)
+    stacked = compute_stacked_conditions(enriched)
+    for node_id, node in enriched["nodes"].items():
+        if node.get("type") != "execute_agent":
+            continue
+        if node_id in stacked:
+            node["stacked_conditions"] = stacked[node_id]
+        else:
+            node.pop("stacked_conditions", None)
+    return enriched
 
 
 # --------------------------------------------------------------------------- #

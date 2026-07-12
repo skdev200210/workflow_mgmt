@@ -12,9 +12,11 @@ from app.api.callbacks import router as callbacks_router
 from app.api.executions import router as executions_router
 from app.api.workflows import router as workflows_router
 from app.core.config import get_settings
+from app.core.logging import setup_logging
 from app.db.base import Base
 from app.db.session import engine
 
+setup_logging()
 settings = get_settings()
 
 

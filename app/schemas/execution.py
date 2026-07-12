@@ -11,23 +11,28 @@ class ExecutionCreate(BaseModel):
     workflow_id: uuid.UUID
     client_id: uuid.UUID | None = None
     customer_id: uuid.UUID | None = None
-    phone_number: str | None = Field(None, max_length=20)
-    # Initial variables the workflow needs (e.g. name, dpd, amount).
-    context: dict[str, Any] = Field(default_factory=dict)
+    # One input CSV row: the initial variables the workflow needs
+    # (e.g. name, phone_number, dpd, amount).
+    input_row: dict[str, Any] = Field(default_factory=dict)
 
 
 class ExecutionRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
+    seq_id: int
     workflow_execution_id: uuid.UUID
     workflow_id: uuid.UUID
     client_id: uuid.UUID | None = None
     customer_id: uuid.UUID | None = None
-    phone_number: str | None = None
     status: str
+    executable_node_id: str | None = None
+    input_file_row_json: dict[str, Any]
     context: dict[str, Any]
-    started_at: datetime | None = None
-    finished_at: datetime | None = None
+    callback_payloads: dict[str, Any]
+    last_triggered_at: datetime | None = None
+    next_trigger_at: datetime | None = None
+    attempts: int
+    max_attempts: int
     error: str | None = None
     created_at: datetime
     updated_at: datetime
@@ -36,18 +41,14 @@ class ExecutionRead(BaseModel):
 class AgentExecutionRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
+    seq_id: int
     agent_execution_id: uuid.UUID
     workflow_execution_id: uuid.UUID
-    node_id: str
     agent_id: uuid.UUID
-    agent_type: str
+    node_id: str
     attempt: int
-    input_context: dict[str, Any] | None = None
-    request_payload: dict[str, Any] | None = None
-    result: dict[str, Any] | None = None
-    output_variables: dict[str, Any] | None = None
+    input_payload: dict[str, Any] | None = None
+    output_payload: dict[str, Any] | None = None
     status: str
-    started_at: datetime | None = None
-    finished_at: datetime | None = None
-    duration_ms: int | None = None
     created_at: datetime
+    updated_at: datetime

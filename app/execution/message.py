@@ -33,18 +33,69 @@ class MessageExecutor(MessageExecutorBase):
 
 
 class SmsExecutor(MessageExecutor):
-    """SMS channel. Shares the message field shape for now."""
+    """Simulated SMS channel. Shares the message field shape for now."""
 
     agent_type = "sms"
 
+    def execute(self, context: Mapping[str, Any]) -> ExecutionResult:
+        self._check_inputs(context)
+
+        body = self._render(self.metadata.message, context)
+        actions = [
+            "[SIMULATED SMS] dispatch SMS",
+            f"send text: {body!r}",
+        ]
+        return ExecutionResult(
+            agent_id=self.agent_id,
+            agent_type=self.agent_type,
+            status="simulated",
+            actions=actions,
+            rendered={"message": body},
+            outputs={},
+        )
+
 
 class RcsExecutor(MessageExecutor):
-    """RCS channel. Shares the message field shape for now."""
+    """Simulated RCS channel. Shares the message field shape for now."""
 
     agent_type = "rcs"
 
+    def execute(self, context: Mapping[str, Any]) -> ExecutionResult:
+        self._check_inputs(context)
+
+        body = self._render(self.metadata.message, context)
+        actions = [
+            "[SIMULATED RCS] dispatch RCS message",
+            f"send rich text: {body!r}",
+        ]
+        return ExecutionResult(
+            agent_id=self.agent_id,
+            agent_type=self.agent_type,
+            status="simulated",
+            actions=actions,
+            rendered={"message": body},
+            outputs={},
+        )
+
 
 class WhatsAppExecutor(MessageExecutor):
-    """WhatsApp channel. Shares the message field shape for now."""
+    """Simulated WhatsApp channel. Shares the message field shape for now."""
 
     agent_type = "whatsapp"
+
+    def execute(self, context: Mapping[str, Any]) -> ExecutionResult:
+        self._check_inputs(context)
+
+        body = self._render(self.metadata.message, context)
+        actions = [
+            "[SIMULATED WHATSAPP] dispatch WhatsApp message",
+            f"send: {body!r}",
+        ]
+        return ExecutionResult(
+            agent_id=self.agent_id,
+            agent_type=self.agent_type,
+            status="simulated",
+            actions=actions,
+            rendered={"message": body},
+            outputs={},
+        )

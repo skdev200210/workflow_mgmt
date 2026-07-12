@@ -9,6 +9,7 @@ from app.schemas.workflow import (
     WorkflowCreate,
     WorkflowDefinition,
     WorkflowUpdate,
+    attach_stacked_conditions,
     collect_agent_ids,
 )
 
@@ -38,7 +39,8 @@ async def create_workflow(db: AsyncSession, data: WorkflowCreate) -> Workflow:
     await _assert_agents_exist(db, data.definition)
     workflow = Workflow(
         name=data.name,
-        definition=data.definition.model_dump(mode="json"),
+        # Enrich each agent node with its derived stacked_conditions at save time.
+        definition=attach_stacked_conditions(data.definition.model_dump(mode="json")),
     )
     db.add(workflow)
     await db.commit()
@@ -71,8 +73,11 @@ async def update_workflow(
     one (after re-validating agent references); ``name`` is set if provided."""
     if payload.definition is not None:
         await _assert_agents_exist(db, payload.definition)
-        # Reassign a fresh dict so SQLAlchemy detects the change.
-        workflow.definition = payload.definition.model_dump(mode="json")
+        # Reassign a fresh dict so SQLAlchemy detects the change; re-derive the
+        # stacked conditions for the edited graph.
+        workflow.definition = attach_stacked_conditions(
+            payload.definition.model_dump(mode="json")
+        )
     if payload.name is not None:
         workflow.name = payload.name
 

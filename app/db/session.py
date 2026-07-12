@@ -1,6 +1,5 @@
 from collections.abc import AsyncGenerator
 
-from sqlalchemy.engine import make_url
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
     AsyncSession,
@@ -14,7 +13,7 @@ settings = get_settings()
 
 engine: AsyncEngine = create_async_engine(
     settings.database_url,
-    echo=settings.debug,
+    echo=settings.sql_echo,
     pool_pre_ping=True,
     connect_args={"ssl": "disable"}
 )
