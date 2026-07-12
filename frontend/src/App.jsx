@@ -28,12 +28,13 @@ import {
 import { agentPreview, categoryForType, typeLabel } from './catalog.js'
 import { decisionLabel } from './conditionText.js'
 
-let idCounter = 0
-const nextId = (kind) => `${kind}_${Date.now()}_${++idCounter}`
+// Every node/edge id is a UUID — these become the node keys (and
+// workflow_start / executable_node_id) in the stored definition.
+const newId = () => crypto.randomUUID()
 
-const initialNodes = [
-  { id: 'start', type: 'leaf', deletable: false, position: { x: 320, y: 20 }, data: { kind: 'leaf', label: 'Start', role: 'start' } },
-  { id: 'end', type: 'leaf', deletable: false, position: { x: 320, y: 460 }, data: { kind: 'leaf', label: 'End', role: 'end' } },
+const makeInitialNodes = () => [
+  { id: newId(), type: 'leaf', deletable: false, position: { x: 320, y: 20 }, data: { kind: 'leaf', label: 'Start', role: 'start' } },
+  { id: newId(), type: 'leaf', deletable: false, position: { x: 320, y: 460 }, data: { kind: 'leaf', label: 'End', role: 'end' } },
 ]
 
 // Node data for a graph node that references an existing agent.
@@ -55,6 +56,7 @@ function agentNodeData(catalog, agent) {
 }
 
 export default function App() {
+  const initialNodes = useMemo(makeInitialNodes, [])
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes)
   const [edges, setEdges, onEdgesChange] = useEdgesState([])
   const [selected, setSelected] = useState(null)
@@ -115,14 +117,14 @@ export default function App() {
         data = { branch }
         label = branch ? 'True' : 'False'
       }
-      setEdges((eds) => addEdge({ ...params, id: nextId('edge'), type: 'step', data, label }, eds))
+      setEdges((eds) => addEdge({ ...params, id: newId(), type: 'step', data, label }, eds))
     },
     [setEdges, nodes],
   )
 
   const addAgentNode = useCallback(
     (agent) => {
-      const id = nextId('agent')
+      const id = newId()
       const position = { x: 120 + Math.random() * 360, y: 160 + Math.random() * 160 }
       setNodes((nds) => nds.concat({ id, type: 'agent', position, data: agentNodeData(catalog, agent) }))
       setSelected({ type: 'node', id })
@@ -131,14 +133,14 @@ export default function App() {
   )
 
   const addLeafNode = useCallback(() => {
-    const id = nextId('leaf')
+    const id = newId()
     const position = { x: 120 + Math.random() * 360, y: 160 + Math.random() * 160 }
     setNodes((nds) => nds.concat({ id, type: 'leaf', position, data: { kind: 'leaf', label: 'Step', role: '' } }))
     setSelected({ type: 'node', id })
   }, [setNodes])
 
   const addDecisionNode = useCallback(() => {
-    const id = nextId('decision')
+    const id = newId()
     const position = { x: 120 + Math.random() * 360, y: 160 + Math.random() * 160 }
     setNodes((nds) =>
       nds.concat({

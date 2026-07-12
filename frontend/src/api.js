@@ -142,8 +142,11 @@ export async function saveWorkflow(settings, { name, nodes, edges, callingConfig
     const kind = node.data.kind
     if (kind === 'decision') {
       const conds = node.data.conditions || []
-      if (!conds.length || conds.some((c) => !conditionComplete(c))) {
-        throw new Error(`Decision "${node.data.label}" needs at least one complete condition.`)
+      if (conds.length !== 1 || !conditionComplete(conds[0])) {
+        throw new Error(
+          `Decision "${node.data.label}" needs exactly one complete condition ` +
+            `(stack decision nodes for compound logic).`,
+        )
       }
       nodesDef[node.id] = {
         type: 'decision',
