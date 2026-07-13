@@ -1,0 +1,178 @@
+{
+    "nodes": {
+        "end": {
+            "type": "leaf_node",
+            "edges": [],
+            "label": "End",
+            "input_data": null,
+            "node_config": {},
+        },
+        "start": {
+            "type": "leaf_node",
+            "edges": [
+                {
+                    "id": "edge_1783664408133_4",
+                    "branch": null,
+                    "target": "decision_1783664396563_3",
+                    "agent_id": null,
+                }
+            ],
+            "label": "Start",
+            "input_data": null,
+            "node_config": {},
+        },
+        "agent_1783664384488_1": {
+            "type": "execute_agent",
+            "edges": [
+                {
+                    "id": "edge_1783664529699_11",
+                    "branch": null,
+                    "target": "decision_1783664495970_9",
+                    "agent_id": null,
+                }
+            ],
+            "label": "AI-Calling-Agent-PTP",
+            "input_data": null,
+            "node_config": {"agent_id": "78a81bfd-9045-4216-aadf-4d43b13555d9"},
+            "stacked_conditions": [{"key": "dpd", "value": 30, "operator": ">"}],
+        },
+        "agent_1783664433497_6": {
+            "type": "execute_agent",
+            "edges": [
+                {
+                    "id": "edge_1783664613591_18",
+                    "branch": null,
+                    "target": "decision_1783664595494_17",
+                    "agent_id": null,
+                }
+            ],
+            "label": "AI-Calling-Agent-PTP",
+            "input_data": null,
+            "node_config": {"agent_id": "78a81bfd-9045-4216-aadf-4d43b13555d9"},
+            "stacked_conditions": [{"key": "dpd", "value": 30, "operator": "<="}],
+        },
+        "agent_1783664457224_8": {
+            "type": "execute_agent",
+            "edges": [
+                {
+                    "id": "edge_1783664582492_15",
+                    "branch": null,
+                    "target": "end",
+                    "agent_id": null,
+                }
+            ],
+            "label": "Whatsapp-Agent-PTP",
+            "input_data": null,
+            "node_config": {"agent_id": "1b228143-32b7-462e-b73c-ca0bf77b79b2"},
+            "stacked_conditions": [
+                {"key": "dpd", "value": 30, "operator": ">"},
+                {"key": "ptp_given_bser", "value": false, "operator": "is"},
+            ],
+        },
+        "agent_1783664559685_13": {
+            "type": "execute_agent",
+            "edges": [
+                {
+                    "id": "edge_1783664588487_16",
+                    "branch": null,
+                    "target": "end",
+                    "agent_id": null,
+                }
+            ],
+            "label": "SMS-Agent-PTP",
+            "input_data": null,
+            "node_config": {"agent_id": "83e3367e-33a6-423d-8c27-43bf99242799"},
+            "stacked_conditions": [
+                {"key": "dpd", "value": 30, "operator": ">"},
+                {"key": "ptp_given_bser", "value": true, "operator": "is"},
+            ],
+        },
+        "agent_1783664619010_19": {
+            "type": "execute_agent",
+            "edges": [
+                {
+                    "id": "edge_1783664635199_21",
+                    "branch": null,
+                    "target": "end",
+                    "agent_id": null,
+                }
+            ],
+            "label": "SMS-Agent-PTP",
+            "input_data": null,
+            "node_config": {"agent_id": "83e3367e-33a6-423d-8c27-43bf99242799"},
+            "stacked_conditions": [
+                {"key": "dpd", "value": 30, "operator": "<="},
+                {"key": "ptp_given_bser", "value": true, "operator": "is"},
+            ],
+        },
+        "decision_1783664396563_3": {
+            "type": "decision",
+            "edges": [
+                {
+                    "id": "edge_1783664429210_5",
+                    "branch": true,
+                    "target": "agent_1783664384488_1",
+                    "agent_id": null,
+                },
+                {
+                    "id": "edge_1783664451645_7",
+                    "branch": false,
+                    "target": "agent_1783664433497_6",
+                    "agent_id": null,
+                },
+            ],
+            "label": "dpd > 30",
+            "match": "all",
+            "conditions": [{"op": ">", "param": "dpd", "value": 30}],
+            "input_data": null,
+            "node_config": {},
+        },
+        "decision_1783664495970_9": {
+            "type": "decision",
+            "edges": [
+                {
+                    "id": "edge_1783664555908_12",
+                    "branch": true,
+                    "target": "agent_1783664457224_8",
+                    "agent_id": null,
+                },
+                {
+                    "id": "edge_1783664566857_14",
+                    "branch": false,
+                    "target": "agent_1783664559685_13",
+                    "agent_id": null,
+                },
+            ],
+            "label": "ptp_given_bser is false",
+            "match": "all",
+            "conditions": [{"op": "is", "param": "ptp_given_bser", "value": false}],
+            "input_data": null,
+            "node_config": {},
+        },
+        "decision_1783664595494_17": {
+            "type": "decision",
+            "edges": [
+                {
+                    "id": "edge_1783664624743_20",
+                    "branch": true,
+                    "target": "agent_1783664619010_19",
+                    "agent_id": null,
+                },
+                {
+                    "id": "edge_1783664667100_23",
+                    "branch": false,
+                    "target": "end",
+                    "agent_id": null,
+                },
+            ],
+            "label": "ptp_given_bser is true",
+            "match": "all",
+            "conditions": [{"op": "is", "param": "ptp_given_bser", "value": true}],
+            "input_data": null,
+            "node_config": {},
+        },
+    },
+    "workflow_id": null,
+    "calling_config": null,
+    "workflow_start": "start",
+}
