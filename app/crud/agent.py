@@ -35,9 +35,7 @@ async def list_agents(
     return list(result.scalars().all())
 
 
-async def update_agent(
-    db: AsyncSession, agent: Agent, payload: AgentUpdate
-) -> Agent:
+async def update_agent(db: AsyncSession, agent: Agent, payload: AgentUpdate) -> Agent:
     """Rename and/or partially update agent_metadata, re-validating the result.
 
     A provided ``agent_metadata`` is validated against the type's partial update

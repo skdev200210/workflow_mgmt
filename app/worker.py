@@ -10,6 +10,7 @@ against the same table without stepping on each other. Rows advance via the
 /callbacks endpoint, not here. All statements are built with the SQLAlchemy
 ORM expression language (no raw SQL).
 """
+
 import asyncio
 import logging
 import uuid
@@ -45,7 +46,9 @@ def _claim_stmt(batch: int):
     )
     return (
         update(WorkflowExecution)
-        .where(WorkflowExecution.workflow_execution_id == claimed.c.workflow_execution_id)
+        .where(
+            WorkflowExecution.workflow_execution_id == claimed.c.workflow_execution_id
+        )
         .values(status="processing", attempts=WorkflowExecution.attempts + 1)
         .returning(WorkflowExecution.workflow_execution_id)
     )
@@ -125,7 +128,10 @@ async def _dispatch_one(execution_id: uuid.UUID) -> None:
         except Exception as exc:  # noqa: BLE001 — isolate per-row failures
             logger.exception(
                 "dispatch failed",
-                extra={"event": "dispatch_error", "workflow_execution_id": execution_id},
+                extra={
+                    "event": "dispatch_error",
+                    "workflow_execution_id": execution_id,
+                },
             )
             await db.rollback()
             async with AsyncSessionLocal() as db2:
@@ -181,7 +187,8 @@ async def run_worker() -> None:
         processed = await process_available()
         if processed:
             logger.info(
-                "batch dispatched", extra={"event": "batch_dispatched", "count": processed}
+                "batch dispatched",
+                extra={"event": "batch_dispatched", "count": processed},
             )
         else:
             await asyncio.sleep(settings.worker_poll_interval)

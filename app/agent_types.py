@@ -5,6 +5,7 @@ Two base categories (calling, message) each have child types. For now every
 type in a category shares that category's field shape and metadata model
 (distinct per-channel fields can be added later without touching callers).
 """
+
 from typing import Any
 
 from pydantic import BaseModel
@@ -20,15 +21,57 @@ from app.schemas.agent import (
 # role: "template" (f-string), "input_vars"/"output_vars" (name lists), "plain".
 # kind: "text" | "textarea" | "list".
 CALLING_FIELDS: list[dict[str, Any]] = [
-    {"name": "start_message", "label": "Start message", "kind": "text", "required": True, "role": "plain"},
-    {"name": "end_message", "label": "End message", "kind": "text", "required": True, "role": "plain"},
-    {"name": "system_instructions", "label": "System instructions", "kind": "textarea", "required": True, "role": "template"},
-    {"name": "input_variables", "label": "Input variables", "kind": "list", "required": False, "role": "input_vars"},
-    {"name": "output_variables", "label": "Output variables", "kind": "list", "required": False, "role": "output_vars"},
+    {
+        "name": "start_message",
+        "label": "Start message",
+        "kind": "text",
+        "required": True,
+        "role": "plain",
+    },
+    {
+        "name": "end_message",
+        "label": "End message",
+        "kind": "text",
+        "required": True,
+        "role": "plain",
+    },
+    {
+        "name": "system_instructions",
+        "label": "System instructions",
+        "kind": "textarea",
+        "required": True,
+        "role": "template",
+    },
+    {
+        "name": "input_variables",
+        "label": "Input variables",
+        "kind": "list",
+        "required": False,
+        "role": "input_vars",
+    },
+    {
+        "name": "output_variables",
+        "label": "Output variables",
+        "kind": "list",
+        "required": False,
+        "role": "output_vars",
+    },
 ]
 MESSAGE_FIELDS: list[dict[str, Any]] = [
-    {"name": "message", "label": "Message", "kind": "textarea", "required": True, "role": "template"},
-    {"name": "input_variables", "label": "Input variables", "kind": "list", "required": False, "role": "input_vars"},
+    {
+        "name": "message",
+        "label": "Message",
+        "kind": "textarea",
+        "required": True,
+        "role": "template",
+    },
+    {
+        "name": "input_variables",
+        "label": "Input variables",
+        "kind": "list",
+        "required": False,
+        "role": "input_vars",
+    },
 ]
 
 CATEGORIES: dict[str, dict[str, Any]] = {

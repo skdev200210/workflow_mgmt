@@ -4,6 +4,7 @@ Conditions are ``{"param": <name>, "op": <operator>, "value": <literal>}`` and
 are evaluated against the run context (a dict of variables). Mirrors the
 operators allowed by ``app.schemas.workflow.Condition``.
 """
+
 import logging
 from typing import Any
 
@@ -29,11 +30,13 @@ class MissingParamError(Exception):
 def _num(x: Any) -> float | None:
     try:
         return float(x)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         return None
 
 
-def evaluate_condition(condition: dict[str, Any] | None, context: dict[str, Any]) -> bool:
+def evaluate_condition(
+    condition: dict[str, Any] | None, context: dict[str, Any]
+) -> bool:
     """Return whether ``condition`` holds for ``context``.
 
     A missing/None condition is treated as always-true (unconditional). A param
@@ -100,7 +103,9 @@ def select_next_edge(
     Returns None when nothing matches (the branch ends here).
     """
     if node.get("type") == "decision":
-        result = evaluate_conditions(node.get("conditions"), node.get("match", "all"), context)
+        result = evaluate_conditions(
+            node.get("conditions"), node.get("match", "all"), context
+        )
         for edge in node.get("edges", []):
             if edge.get("branch") == result:
                 return edge

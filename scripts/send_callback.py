@@ -1,4 +1,4 @@
-import requests #type: ignore
+import requests  # type: ignore
 
 BASE_URL = "http://localhost:8000"
 API_KEY = "changeme-dev-key"
@@ -40,7 +40,7 @@ send_callback(
     "sam",
     {
         "source": "calling",
-        "outcome": "success", 
+        "outcome": "success",
         "outputs": {
             "ptp_given_bser": False,
         },

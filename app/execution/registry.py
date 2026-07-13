@@ -39,5 +39,7 @@ def build_executor(agent: _AgentLike) -> AgentExecutor:
     if executor_cls is None:
         raise ValueError(f"no executor for agent_type={agent.agent_type!r}")
 
-    metadata = metadata_model_for_type(agent.agent_type).model_validate(agent.agent_metadata)
+    metadata = metadata_model_for_type(agent.agent_type).model_validate(
+        agent.agent_metadata
+    )
     return executor_cls(agent.agent_id, metadata)

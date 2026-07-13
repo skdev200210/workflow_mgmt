@@ -25,7 +25,9 @@ def extract_placeholders(template: str) -> set[str]:
     return names
 
 
-def _assert_inputs_present(template: str, input_variables: list[str], field: str) -> None:
+def _assert_inputs_present(
+    template: str, input_variables: list[str], field: str
+) -> None:
     placeholders = extract_placeholders(template)
     missing = [v for v in input_variables if v not in placeholders]
     if missing:

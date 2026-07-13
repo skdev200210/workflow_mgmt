@@ -35,7 +35,9 @@ class WorkflowExecution(Base, TimestampMixin):
 
     __tablename__ = "workflow_execution"
 
-    seq_id: Mapped[int] = mapped_column(BigInteger, Identity(), unique=True, nullable=False)
+    seq_id: Mapped[int] = mapped_column(
+        BigInteger, Identity(), unique=True, nullable=False
+    )
     workflow_execution_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
@@ -50,9 +52,13 @@ class WorkflowExecution(Base, TimestampMixin):
     # execute_agent node — decisions are resolved inline, never stored.
     executable_node_id: Mapped[str | None] = mapped_column(String(128))
 
-    input_file_row_json: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, default=dict)
+    input_file_row_json: Mapped[dict[str, Any]] = mapped_column(
+        JSONB, nullable=False, default=dict
+    )
     context: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, default=dict)
-    callback_payloads: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, default=dict)
+    callback_payloads: Mapped[dict[str, Any]] = mapped_column(
+        JSONB, nullable=False, default=dict
+    )
 
     last_triggered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     next_trigger_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
@@ -72,11 +78,15 @@ class AgentExecution(Base, TimestampMixin):
 
     __tablename__ = "agent_execution"
 
-    seq_id: Mapped[int] = mapped_column(BigInteger, Identity(), unique=True, nullable=False)
+    seq_id: Mapped[int] = mapped_column(
+        BigInteger, Identity(), unique=True, nullable=False
+    )
     agent_execution_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
-    workflow_execution_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
+    workflow_execution_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), nullable=False
+    )
     agent_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
     node_id: Mapped[str] = mapped_column(String(128), nullable=False)
     attempt: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
@@ -86,4 +96,6 @@ class AgentExecution(Base, TimestampMixin):
     # The provider's callback, verbatim.
     output_payload: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
     # dispatched -> callback_received | failed | stale | timed_out
-    status: Mapped[str] = mapped_column(String(20), nullable=False, default="dispatched")
+    status: Mapped[str] = mapped_column(
+        String(20), nullable=False, default="dispatched"
+    )

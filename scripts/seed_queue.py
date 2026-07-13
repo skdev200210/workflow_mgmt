@@ -12,6 +12,7 @@ workflow's agents/decisions need (e.g. name, dpd, amount).
 
 Run:  uv run python scripts/seed_queue.py
 """
+
 import asyncio
 import csv
 import sys
@@ -30,16 +31,20 @@ from app.models.workflow import Workflow  # noqa: E402
 # CONFIG — edit these instead of passing CLI args
 # --------------------------------------------------------------------------- #
 CSV_PATH = Path(__file__).resolve().parent.parent / "data" / "input_rows.csv"
-WORKFLOW_ID = "d8d1127e-970e-4417-b8bd-4e432bd52c23"            # UUID string; None = latest workflow
-CLIENT_ID: str | None = None              # optional UUID string
+WORKFLOW_ID = (
+    "d8d1127e-970e-4417-b8bd-4e432bd52c23"  # UUID string; None = latest workflow
+)
+CLIENT_ID: str | None = None  # optional UUID string
 
 
 async def _pick_workflow(db) -> Workflow | None:
     if WORKFLOW_ID:
         return await db.get(Workflow, uuid.UUID(WORKFLOW_ID))
     return (
-        await db.execute(select(Workflow).order_by(Workflow.created_at.desc()))
-    ).scalars().first()
+        (await db.execute(select(Workflow).order_by(Workflow.created_at.desc())))
+        .scalars()
+        .first()
+    )
 
 
 async def seed() -> None:
@@ -67,7 +72,9 @@ async def seed() -> None:
 
     print(f"\nseeded {count} pending run(s) into workflow_execution.")
     print("Dispatch them with the worker:   uv run python -m app.worker")
-    print("Correlation ids for callbacks:   GET /executions/{workflow_execution_id}/agent-executions")
+    print(
+        "Correlation ids for callbacks:   GET /executions/{workflow_execution_id}/agent-executions"
+    )
 
 
 async def main() -> None:

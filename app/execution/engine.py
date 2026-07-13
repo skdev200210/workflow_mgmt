@@ -18,6 +18,7 @@ Model (single-table queue):
 No caching: the workflow definition is read fresh from the workflows table on
 every dispatch/callback.
 """
+
 import logging
 import uuid
 from datetime import datetime, timedelta, timezone
@@ -43,7 +44,9 @@ def _now() -> datetime:
     return datetime.now(timezone.utc)
 
 
-async def get_workflow_definition(db: AsyncSession, workflow_id: uuid.UUID) -> dict[str, Any]:
+async def get_workflow_definition(
+    db: AsyncSession, workflow_id: uuid.UUID
+) -> dict[str, Any]:
     """Read the definition fresh from the workflows table (no caching)."""
     wf = await db.get(Workflow, workflow_id)
     if wf is None:
@@ -93,7 +96,9 @@ def resolve_next_actionable(
             return ("end", target_id, target)
         # Intermediate leaf or another decision: keep walking.
         current = target
-    logger.warning("decision-chain hop cap (%s) reached; ending branch", _MAX_DECISION_HOPS)
+    logger.warning(
+        "decision-chain hop cap (%s) reached; ending branch", _MAX_DECISION_HOPS
+    )
     return ("none", None, None)
 
 
@@ -118,7 +123,9 @@ def _retry_delay_seconds(definition: dict[str, Any]) -> int:
     return settings.default_retry_seconds
 
 
-def _finish(execution: WorkflowExecution, *, status: str, error: str | None = None) -> None:
+def _finish(
+    execution: WorkflowExecution, *, status: str, error: str | None = None
+) -> None:
     """Move the run to a terminal status (completed | failed | dead_letter)."""
     execution.status = status
     execution.error = error
@@ -135,7 +142,11 @@ def _finish(execution: WorkflowExecution, *, status: str, error: str | None = No
     )
 
 
-def _record_callback(execution: WorkflowExecution, agent_execution_id: uuid.UUID, payload_json: dict[str, Any]) -> None:
+def _record_callback(
+    execution: WorkflowExecution,
+    agent_execution_id: uuid.UUID,
+    payload_json: dict[str, Any],
+) -> None:
     """Append the raw callback under its correlation id (list per key, so every
     callback — including duplicates — is kept). Reassigned so SQLAlchemy sees
     the JSONB change."""
@@ -181,7 +192,9 @@ async def start_execution(
 # --------------------------------------------------------------------------- #
 # Dispatch (worker side) — fire and forget
 # --------------------------------------------------------------------------- #
-async def dispatch_execution(db: AsyncSession, execution: WorkflowExecution) -> uuid.UUID | None:
+async def dispatch_execution(
+    db: AsyncSession, execution: WorkflowExecution
+) -> uuid.UUID | None:
     """Dispatch one claimed run and forget.
 
     If ``executable_node_id`` is not an agent node (start node, or a decision
@@ -215,7 +228,9 @@ async def dispatch_execution(db: AsyncSession, execution: WorkflowExecution) -> 
     if node.get("type") != "execute_agent":
         source_node_id = execution.executable_node_id
         try:
-            kind, node_id, node_def = resolve_next_actionable(definition, node, execution.context)
+            kind, node_id, node_def = resolve_next_actionable(
+                definition, node, execution.context
+            )
         except MissingParamError as exc:
             _finish(execution, status="failed", error=str(exc))
             await db.commit()
@@ -238,7 +253,9 @@ async def dispatch_execution(db: AsyncSession, execution: WorkflowExecution) -> 
         )
 
     agent_id = (node.get("node_config") or {}).get("agent_id")
-    agent = await db.get(Agent, uuid.UUID(agent_id) if isinstance(agent_id, str) else agent_id)
+    agent = await db.get(
+        Agent, uuid.UUID(agent_id) if isinstance(agent_id, str) else agent_id
+    )
     if agent is None:
         _finish(execution, status="failed", error=f"agent {agent_id} not found")
         await db.commit()
@@ -256,7 +273,10 @@ async def dispatch_execution(db: AsyncSession, execution: WorkflowExecution) -> 
         agent_id=agent.agent_id,
         node_id=execution.executable_node_id,
         attempt=execution.attempts,
-        input_payload={"context": dict(execution.context), "request": _result_to_json(result)},
+        input_payload={
+            "context": dict(execution.context),
+            "request": _result_to_json(result),
+        },
         status="dispatched",
     )
     db.add(receipt)
@@ -322,7 +342,11 @@ async def apply_callback(db: AsyncSession, payload: Any) -> dict[str, Any]:
         await db.commit()
         logger.info(
             "duplicate callback ignored",
-            extra={"event": "callback_duplicate", "receipt_status": receipt.status, **log_ctx},
+            extra={
+                "event": "callback_duplicate",
+                "receipt_status": receipt.status,
+                **log_ctx,
+            },
         )
         return {"processed": False, "reason": f"already finalized ({receipt.status})"}
 
@@ -347,7 +371,11 @@ async def apply_callback(db: AsyncSession, payload: Any) -> dict[str, Any]:
 
     if payload.outcome == "failure":
         _finish_receipt("failed")
-        _finish(execution, status="failed", error=payload.status or "callback reported failure")
+        _finish(
+            execution,
+            status="failed",
+            error=payload.status or "callback reported failure",
+        )
         await db.commit()
         return _run_state(execution, processed=True)
 
@@ -392,7 +420,9 @@ async def apply_callback(db: AsyncSession, payload: Any) -> dict[str, Any]:
 
     current_node = definition["nodes"][execution.executable_node_id]
     try:
-        kind, node_id, _node_def = resolve_next_actionable(definition, current_node, merged)
+        kind, node_id, _node_def = resolve_next_actionable(
+            definition, current_node, merged
+        )
     except MissingParamError as exc:
         _finish(execution, status="failed", error=str(exc))
         await db.commit()

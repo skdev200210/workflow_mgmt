@@ -187,13 +187,17 @@ def _branch_conditions(node: dict[str, Any], branch: bool) -> list[dict[str, Any
         return [_flat_condition(c, invert=not branch) for c in conds]
     # True of an ANY group / False of an ALL group are OR-shaped — keep them as
     # one nested group instead of silently storing wrong semantics.
-    return [{
-        "match": "any",
-        "conditions": [_flat_condition(c, invert=not branch) for c in conds],
-    }]
+    return [
+        {
+            "match": "any",
+            "conditions": [_flat_condition(c, invert=not branch) for c in conds],
+        }
+    ]
 
 
-def compute_stacked_conditions(definition: dict[str, Any]) -> dict[str, list[dict[str, Any]]]:
+def compute_stacked_conditions(
+    definition: dict[str, Any],
+) -> dict[str, list[dict[str, Any]]]:
     """For every reachable execute_agent node: the flattened stack of ALL
     decision conditions (AND-combined) on the path from workflow_start to it —
     accumulated straight through any agent nodes in between.

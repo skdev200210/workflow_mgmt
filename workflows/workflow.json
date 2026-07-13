@@ -1,4 +1,9 @@
 {
+    "calling_config": {
+        "call_not_answered": {
+            "retry": {"value": "min", "units": 5}
+        }
+    },
     "nodes": {
         "end": {
             "type": "leaf_node",
@@ -173,6 +178,5 @@
         },
     },
     "workflow_id": null,
-    "calling_config": null,
     "workflow_start": "start",
 }

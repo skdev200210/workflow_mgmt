@@ -48,9 +48,7 @@ async def create_workflow(db: AsyncSession, data: WorkflowCreate) -> Workflow:
     return workflow
 
 
-async def get_workflow(
-    db: AsyncSession, workflow_id: uuid.UUID
-) -> Workflow | None:
+async def get_workflow(db: AsyncSession, workflow_id: uuid.UUID) -> Workflow | None:
     return await db.get(Workflow, workflow_id)
 
 
@@ -58,10 +56,7 @@ async def list_workflows(
     db: AsyncSession, *, skip: int = 0, limit: int = 100
 ) -> list[Workflow]:
     result = await db.execute(
-        select(Workflow)
-        .order_by(Workflow.created_at.desc())
-        .offset(skip)
-        .limit(limit)
+        select(Workflow).order_by(Workflow.created_at.desc()).offset(skip).limit(limit)
     )
     return list(result.scalars().all())
 

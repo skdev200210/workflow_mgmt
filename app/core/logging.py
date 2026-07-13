@@ -11,6 +11,7 @@ object, so engine/worker events carry their ids as queryable fields instead of
 being formatted into the message. SQLAlchemy loggers are capped at WARNING —
 SQL statement echo is opt-in via the SQL_ECHO setting, not tied to DEBUG.
 """
+
 import json
 import logging
 import sys
@@ -18,13 +19,34 @@ from datetime import datetime, timezone
 
 # Attributes present on every LogRecord — anything else came in via ``extra``.
 # ``color_message`` is uvicorn's ANSI-colored duplicate of ``message``; drop it.
-_STANDARD_ATTRS = frozenset({
-    "name", "msg", "args", "levelname", "levelno", "pathname", "filename",
-    "module", "exc_info", "exc_text", "stack_info", "lineno", "funcName",
-    "created", "msecs", "relativeCreated", "thread", "threadName",
-    "processName", "process", "taskName", "message", "asctime",
-    "color_message",
-})
+_STANDARD_ATTRS = frozenset(
+    {
+        "name",
+        "msg",
+        "args",
+        "levelname",
+        "levelno",
+        "pathname",
+        "filename",
+        "module",
+        "exc_info",
+        "exc_text",
+        "stack_info",
+        "lineno",
+        "funcName",
+        "created",
+        "msecs",
+        "relativeCreated",
+        "thread",
+        "threadName",
+        "processName",
+        "process",
+        "taskName",
+        "message",
+        "asctime",
+        "color_message",
+    }
+)
 
 _NOISY_LOGGERS = (
     "sqlalchemy.engine",
