@@ -10,6 +10,22 @@ from typing import Any
 logger = logging.getLogger(__name__)
 
 
+class MissingParamError(Exception):
+    """A condition references a param that is not present in the run context.
+
+    Raised instead of silently evaluating False so a run whose context lacks a
+    decision variable (e.g. the callback never captured it, or sent it under a
+    different key) fails loudly instead of quietly taking the False branch.
+    """
+
+    def __init__(self, param: Any, context: dict[str, Any]):
+        self.param = param
+        super().__init__(
+            f"decision condition references param {param!r} which is missing "
+            f"from the run context (available params: {sorted(context.keys())})"
+        )
+
+
 def _num(x: Any) -> float | None:
     try:
         return float(x)
@@ -21,8 +37,9 @@ def evaluate_condition(condition: dict[str, Any] | None, context: dict[str, Any]
     """Return whether ``condition`` holds for ``context``.
 
     A missing/None condition is treated as always-true (unconditional). A param
-    absent from the context makes the condition False. Numeric comparisons coerce
-    both sides to float; ``==``/``!=`` compare by value; ``is`` compares booleans.
+    absent from the context raises :class:`MissingParamError`. Numeric
+    comparisons coerce both sides to float; ``==``/``!=`` compare by value;
+    ``is`` compares booleans.
     """
     if not condition:
         return True
@@ -32,7 +49,7 @@ def evaluate_condition(condition: dict[str, Any] | None, context: dict[str, Any]
     expected = condition.get("value")
 
     if param not in context:
-        return False
+        raise MissingParamError(param, context)
     actual = context[param]
 
     if op in (">", "<", ">=", "<="):

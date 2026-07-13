@@ -87,22 +87,3 @@ class AgentExecution(Base, TimestampMixin):
     output_payload: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
     # dispatched -> callback_received | failed | stale | timed_out
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="dispatched")
-
-
-# --------------------------------------------------------------------------- #
-# Indexes — declared with ORM column expressions (registered on Base.metadata).
-# --------------------------------------------------------------------------- #
-# Hot claim scan: only rows still waiting to run.
-Index(
-    "ix_execution_due",
-    WorkflowExecution.next_trigger_at,
-    postgresql_where=(WorkflowExecution.status == "pending"),
-)
-# Sweeper scan: in_flight rows whose callback never arrived (timeout is derived
-# as last_triggered_at + dispatch_timeout_seconds).
-Index(
-    "ix_execution_inflight",
-    WorkflowExecution.last_triggered_at,
-    postgresql_where=(WorkflowExecution.status == "in_flight"),
-)
-Index("ix_agentexec_execution", AgentExecution.workflow_execution_id)

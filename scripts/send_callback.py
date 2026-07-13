@@ -9,11 +9,16 @@ HEADERS = {
 }
 
 AGENT_EXECUTIONS = {
-    "sam": "0cee0ca0-683b-4872-8178-32064f30968b",
-    "ravi": "f2b18ebf-58dc-487c-a96c-6a3a3b8bd264",
-    "arjun": "d91954bd-d6bc-40c1-8792-53c5c1ce7866",
-    "priya": "841236de-df0b-4f41-bfb0-28f9eeb1ad30",
-    "meera": "bc3df2f9-db45-4488-abd3-db7b399653af",
+    # "sam": "62811f8f-482f-40cc-9e46-eea2db3ca6f7",
+    "sam": "bbfaff51-b46e-46a8-8021-a58b6a4ea2dc",
+    # "ravi": "f25a2565-d212-4b37-a58a-8d7b2ffb4978",
+    "ravi": "6266f4f8-6e8e-4264-b0fd-f5d37e2073e6",
+    # "arjun": "b17d5d7c-a2d3-4bb5-853f-72e691ba6d61",
+    "arjun": "c13bdf5d-6d16-4d97-af71-5722ce382ddc",
+    # "priya": "9a30f30d-0e5c-4f27-b666-11d83a49aaa8",
+    "priya": "6d96e8c3-7392-4a5c-a090-1b37da8e4a50",
+    "meera": "fc51b4ca-aab8-42bb-bae7-4b97bf965eb5",
+    "sam_whatsapp": "bbfaff51-b46e-46a8-8021-a58b6a4ea2dc",
 }
 
 
@@ -37,7 +42,7 @@ send_callback(
         "source": "calling",
         "outcome": "success", 
         "outputs": {
-            "ptp": True,
+            "ptp_given_bser": False,
         },
         "result": {
             "provider": "mock",
@@ -91,6 +96,19 @@ send_callback(
         "result": {
             "provider": "mock",
             "error_code": "E42",
+        },
+    },
+)
+
+
+send_callback(
+    "sam_whatsapp",
+    {
+        "source": "whatsapp",
+        "outcome": "success",
+        "result": {
+            "provider": "mock",
+            "delivered": True,
         },
     },
 )

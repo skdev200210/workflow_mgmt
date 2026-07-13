@@ -27,7 +27,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
 from app.execution.base import ExecutionResult
-from app.execution.conditions import select_next_edge
+from app.execution.conditions import MissingParamError, select_next_edge
 from app.execution.registry import build_executor
 from app.models.agent import Agent
 from app.models.execution import AgentExecution, WorkflowExecution
@@ -214,7 +214,12 @@ async def dispatch_execution(db: AsyncSession, execution: WorkflowExecution) -> 
     # Not an agent node: walk through decisions/leaves inline until we hit one.
     if node.get("type") != "execute_agent":
         source_node_id = execution.executable_node_id
-        kind, node_id, node_def = resolve_next_actionable(definition, node, execution.context)
+        try:
+            kind, node_id, node_def = resolve_next_actionable(definition, node, execution.context)
+        except MissingParamError as exc:
+            _finish(execution, status="failed", error=str(exc))
+            await db.commit()
+            return None
         if kind != "agent":
             _finish(execution, status="completed")
             execution.last_triggered_at = _now()
@@ -386,7 +391,12 @@ async def apply_callback(db: AsyncSession, payload: Any) -> dict[str, Any]:
     execution.context = merged
 
     current_node = definition["nodes"][execution.executable_node_id]
-    kind, node_id, _node_def = resolve_next_actionable(definition, current_node, merged)
+    try:
+        kind, node_id, _node_def = resolve_next_actionable(definition, current_node, merged)
+    except MissingParamError as exc:
+        _finish(execution, status="failed", error=str(exc))
+        await db.commit()
+        return _run_state(execution, processed=True)
     if kind == "agent":
         execution.executable_node_id = node_id
         execution.status = "pending"
