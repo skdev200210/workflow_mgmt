@@ -27,6 +27,13 @@ from typing import Any
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
+from app.core.enums import (
+    AgentExecutionStatus,
+    CallbackOutcome,
+    ExecutionStatus,
+    NodeType,
+    ResolveKind,
+)
 from app.execution.base import ExecutionResult
 from app.execution.conditions import MissingParamError, select_next_edge
 from app.execution.registry import build_executor
@@ -66,7 +73,7 @@ def _result_to_json(result: ExecutionResult) -> dict[str, Any]:
 
 
 def _is_end_leaf(node: dict[str, Any]) -> bool:
-    return node.get("type") == "leaf_node" and not node.get("edges")
+    return node.get("type") == NodeType.LEAF.value and not node.get("edges")
 
 
 def resolve_next_actionable(
@@ -78,28 +85,28 @@ def resolve_next_actionable(
     Decision nodes are evaluated inline against ``context`` (their True/False
     branch is followed immediately), so any number of stacked filters collapse
     into a single hop. Returns:
-      ("agent", node_id, node_def)  -- next execute_agent node to dispatch
-      ("end", node_id, node_def)    -- a terminal leaf was reached
-      ("none", None, None)          -- no edge matched / hop cap hit (branch ends)
+      (AGENT, node_id, node_def)  -- next execute_agent node to dispatch
+      (END, node_id, node_def)    -- a terminal leaf was reached
+      (NONE, None, None)          -- no edge matched / hop cap hit (branch ends)
     """
     nodes = definition["nodes"]
     current = from_node
     for _ in range(_MAX_DECISION_HOPS):
         edge = select_next_edge(current, context)
         if edge is None:
-            return ("none", None, None)
+            return (ResolveKind.NONE.value, None, None)
         target_id = edge["target"]
         target = nodes[target_id]
-        if target.get("type") == "execute_agent":
-            return ("agent", target_id, target)
+        if target.get("type") == NodeType.EXECUTE_AGENT.value:
+            return (ResolveKind.AGENT.value, target_id, target)
         if _is_end_leaf(target):
-            return ("end", target_id, target)
+            return (ResolveKind.END.value, target_id, target)
         # Intermediate leaf or another decision: keep walking.
         current = target
     logger.warning(
         "decision-chain hop cap (%s) reached; ending branch", _MAX_DECISION_HOPS
     )
-    return ("none", None, None)
+    return (ResolveKind.NONE.value, None, None)
 
 
 def _retry_delay_seconds(definition: dict[str, Any]) -> int:
@@ -124,14 +131,14 @@ def _retry_delay_seconds(definition: dict[str, Any]) -> int:
 
 
 def _finish(
-    execution: WorkflowExecution, *, status: str, error: str | None = None
+    execution: WorkflowExecution, *, status: ExecutionStatus, error: str | None = None
 ) -> None:
     """Move the run to a terminal status (completed | failed | dead_letter)."""
     execution.status = status
     execution.error = error
     execution.next_trigger_at = None
     logger.log(
-        logging.INFO if status == "completed" else logging.WARNING,
+        logging.INFO if status == ExecutionStatus.COMPLETED.value else logging.WARNING,
         "run finished",
         extra={
             "event": f"run_{status}",
@@ -177,7 +184,7 @@ async def start_execution(
         workflow_id=workflow.workflow_id,
         client_id=client_id,
         customer_id=customer_id,
-        status="pending",
+        status=ExecutionStatus.PENDING.value,
         executable_node_id=workflow.definition.get("workflow_start"),
         input_file_row_json=dict(input_row),
         context=dict(input_row),
@@ -210,7 +217,7 @@ async def dispatch_execution(
     try:
         definition = await get_workflow_definition(db, execution.workflow_id)
     except ValueError as exc:
-        _finish(execution, status="failed", error=str(exc))
+        _finish(execution, status=ExecutionStatus.FAILED.value, error=str(exc))
         await db.commit()
         return None
 
@@ -218,25 +225,25 @@ async def dispatch_execution(
     if node is None:
         _finish(
             execution,
-            status="failed",
+            status=ExecutionStatus.FAILED.value,
             error=f"node {execution.executable_node_id!r} not found in workflow definition",
         )
         await db.commit()
         return None
 
     # Not an agent node: walk through decisions/leaves inline until we hit one.
-    if node.get("type") != "execute_agent":
+    if node.get("type") != NodeType.EXECUTE_AGENT.value:
         source_node_id = execution.executable_node_id
         try:
             kind, node_id, node_def = resolve_next_actionable(
                 definition, node, execution.context
             )
         except MissingParamError as exc:
-            _finish(execution, status="failed", error=str(exc))
+            _finish(execution, status=ExecutionStatus.FAILED.value, error=str(exc))
             await db.commit()
             return None
-        if kind != "agent":
-            _finish(execution, status="completed")
+        if kind != ResolveKind.AGENT.value:
+            _finish(execution, status=ExecutionStatus.COMPLETED.value)
             execution.last_triggered_at = _now()
             await db.commit()
             return None
@@ -257,7 +264,11 @@ async def dispatch_execution(
         Agent, uuid.UUID(agent_id) if isinstance(agent_id, str) else agent_id
     )
     if agent is None:
-        _finish(execution, status="failed", error=f"agent {agent_id} not found")
+        _finish(
+            execution,
+            status=ExecutionStatus.FAILED.value,
+            error=f"agent {agent_id} not found",
+        )
         await db.commit()
         return None
 
@@ -277,12 +288,12 @@ async def dispatch_execution(
             "context": dict(execution.context),
             "request": _result_to_json(result),
         },
-        status="dispatched",
+        status=AgentExecutionStatus.DISPATCHED.value,
     )
     db.add(receipt)
     await db.flush()  # assign agent_execution_id
 
-    execution.status = "in_flight"
+    execution.status = ExecutionStatus.IN_FLIGHT.value
     execution.last_triggered_at = now
     execution.next_trigger_at = None
     execution.error = None
@@ -338,7 +349,7 @@ async def apply_callback(db: AsyncSession, payload: Any) -> dict[str, Any]:
     }
     logger.info("callback received", extra={"event": "callback_received", **log_ctx})
 
-    if receipt.status != "dispatched":
+    if receipt.status != AgentExecutionStatus.DISPATCHED.value:
         await db.commit()
         logger.info(
             "duplicate callback ignored",
@@ -350,18 +361,18 @@ async def apply_callback(db: AsyncSession, payload: Any) -> dict[str, Any]:
         )
         return {"processed": False, "reason": f"already finalized ({receipt.status})"}
 
-    def _finish_receipt(status: str) -> None:
+    def _finish_receipt(status: AgentExecutionStatus) -> None:
         receipt.status = status
         receipt.output_payload = payload_json
 
     # Stale: the run was swept/re-dispatched or already advanced past this fire.
     if (
         execution is None
-        or execution.status != "in_flight"
+        or execution.status != ExecutionStatus.IN_FLIGHT.value
         or execution.executable_node_id != receipt.node_id
         or execution.attempts != receipt.attempt
     ):
-        _finish_receipt("stale")
+        _finish_receipt(AgentExecutionStatus.STALE.value)
         await db.commit()
         logger.warning(
             "stale callback (run has moved on)",
@@ -369,11 +380,11 @@ async def apply_callback(db: AsyncSession, payload: Any) -> dict[str, Any]:
         )
         return {"processed": False, "reason": "stale callback (run has moved on)"}
 
-    if payload.outcome == "failure":
-        _finish_receipt("failed")
+    if payload.outcome == CallbackOutcome.FAILURE.value:
+        _finish_receipt(AgentExecutionStatus.FAILED.value)
         _finish(
             execution,
-            status="failed",
+            status=ExecutionStatus.FAILED.value,
             error=payload.status or "callback reported failure",
         )
         await db.commit()
@@ -382,21 +393,21 @@ async def apply_callback(db: AsyncSession, payload: Any) -> dict[str, Any]:
     try:
         definition = await get_workflow_definition(db, execution.workflow_id)
     except ValueError as exc:
-        _finish_receipt("failed")
-        _finish(execution, status="failed", error=str(exc))
+        _finish_receipt(AgentExecutionStatus.FAILED.value)
+        _finish(execution, status=ExecutionStatus.FAILED.value, error=str(exc))
         await db.commit()
         return _run_state(execution, processed=True)
 
-    if payload.outcome == "retry":
-        _finish_receipt("callback_received")
+    if payload.outcome == CallbackOutcome.RETRY.value:
+        _finish_receipt(AgentExecutionStatus.CALLBACK_RECEIVED.value)
         if execution.attempts >= execution.max_attempts:
             _finish(
                 execution,
-                status="dead_letter",
+                status=ExecutionStatus.DEAD_LETTER.value,
                 error=f"max attempts ({execution.max_attempts}) reached at node {execution.executable_node_id}",
             )
         else:
-            execution.status = "pending"
+            execution.status = ExecutionStatus.PENDING.value
             execution.next_trigger_at = payload.next_trigger_at or (
                 now + timedelta(seconds=_retry_delay_seconds(definition))
             )
@@ -413,8 +424,8 @@ async def apply_callback(db: AsyncSession, payload: Any) -> dict[str, Any]:
         await db.commit()
         return _run_state(execution, processed=True)
 
-    # outcome == "success": merge outputs, then advance through stacked decisions.
-    _finish_receipt("callback_received")
+    # outcome == success: merge outputs, then advance through stacked decisions.
+    _finish_receipt(AgentExecutionStatus.CALLBACK_RECEIVED.value)
     merged = {**execution.context, **(payload.outputs or {})}
     execution.context = merged
 
@@ -424,12 +435,12 @@ async def apply_callback(db: AsyncSession, payload: Any) -> dict[str, Any]:
             definition, current_node, merged
         )
     except MissingParamError as exc:
-        _finish(execution, status="failed", error=str(exc))
+        _finish(execution, status=ExecutionStatus.FAILED.value, error=str(exc))
         await db.commit()
         return _run_state(execution, processed=True)
-    if kind == "agent":
+    if kind == ResolveKind.AGENT.value:
         execution.executable_node_id = node_id
-        execution.status = "pending"
+        execution.status = ExecutionStatus.PENDING.value
         execution.attempts = 0  # each node gets a fresh attempt budget
         execution.next_trigger_at = payload.next_trigger_at
         execution.error = None
@@ -443,7 +454,7 @@ async def apply_callback(db: AsyncSession, payload: Any) -> dict[str, Any]:
             },
         )
     else:
-        _finish(execution, status="completed")
+        _finish(execution, status=ExecutionStatus.COMPLETED.value)
 
     await db.commit()
     return _run_state(execution, processed=True)

@@ -6,7 +6,6 @@ from sqlalchemy import (
     BigInteger,
     DateTime,
     Identity,
-    Index,
     Integer,
     String,
     Text,
@@ -15,6 +14,7 @@ from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base, TimestampMixin
+from app.core.enums import AgentExecutionStatus, ExecutionStatus
 
 
 class WorkflowExecution(Base, TimestampMixin):
@@ -47,7 +47,9 @@ class WorkflowExecution(Base, TimestampMixin):
 
     # pending -> processing -> in_flight -> (pending again on advance/retry)
     # terminal: completed | failed | dead_letter
-    status: Mapped[str] = mapped_column(String(20), nullable=False, default="pending")
+    status: Mapped[str] = mapped_column(
+        String(20), nullable=False, default=ExecutionStatus.PENDING.value
+    )
     # The node the worker should trigger next. Always the start node or an
     # execute_agent node — decisions are resolved inline, never stored.
     executable_node_id: Mapped[str | None] = mapped_column(String(128))
@@ -97,5 +99,5 @@ class AgentExecution(Base, TimestampMixin):
     output_payload: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
     # dispatched -> callback_received | failed | stale | timed_out
     status: Mapped[str] = mapped_column(
-        String(20), nullable=False, default="dispatched"
+        String(20), nullable=False, default=AgentExecutionStatus.DISPATCHED.value
     )

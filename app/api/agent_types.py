@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 
-from app.agent_types import build_catalog
+from app.services.agent_types import build_catalog
 from app.schemas.agent_types import AgentCatalog
 
 router = APIRouter(tags=["agent-types"])

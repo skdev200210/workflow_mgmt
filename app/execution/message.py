@@ -1,6 +1,7 @@
 from collections.abc import Mapping
 from typing import Any
 
+from app.core.enums import AgentType, ExecutorStatus
 from app.execution.base import ExecutionResult, MessageExecutorBase
 
 
@@ -12,7 +13,7 @@ class MessageExecutor(MessageExecutorBase):
     same ``execute`` contract and dispatch the actual message here.
     """
 
-    agent_type = "message"
+    agent_type = AgentType.MESSAGE.value
 
     def execute(self, context: Mapping[str, Any]) -> ExecutionResult:
         self._check_inputs(context)
@@ -25,7 +26,7 @@ class MessageExecutor(MessageExecutorBase):
         return ExecutionResult(
             agent_id=self.agent_id,
             agent_type=self.agent_type,
-            status="simulated",
+            status=ExecutorStatus.SIMULATED.value,
             actions=actions,
             rendered={"message": body},
             outputs={},
@@ -35,7 +36,7 @@ class MessageExecutor(MessageExecutorBase):
 class SmsExecutor(MessageExecutor):
     """Simulated SMS channel. Shares the message field shape for now."""
 
-    agent_type = "sms"
+    agent_type = AgentType.SMS.value
 
     def execute(self, context: Mapping[str, Any]) -> ExecutionResult:
         self._check_inputs(context)
@@ -48,7 +49,7 @@ class SmsExecutor(MessageExecutor):
         return ExecutionResult(
             agent_id=self.agent_id,
             agent_type=self.agent_type,
-            status="simulated",
+            status=ExecutorStatus.SIMULATED.value,
             actions=actions,
             rendered={"message": body},
             outputs={},
@@ -58,7 +59,7 @@ class SmsExecutor(MessageExecutor):
 class RcsExecutor(MessageExecutor):
     """Simulated RCS channel. Shares the message field shape for now."""
 
-    agent_type = "rcs"
+    agent_type = AgentType.RCS.value
 
     def execute(self, context: Mapping[str, Any]) -> ExecutionResult:
         self._check_inputs(context)
@@ -71,7 +72,7 @@ class RcsExecutor(MessageExecutor):
         return ExecutionResult(
             agent_id=self.agent_id,
             agent_type=self.agent_type,
-            status="simulated",
+            status=ExecutorStatus.SIMULATED.value,
             actions=actions,
             rendered={"message": body},
             outputs={},
@@ -81,7 +82,7 @@ class RcsExecutor(MessageExecutor):
 class WhatsAppExecutor(MessageExecutor):
     """Simulated WhatsApp channel. Shares the message field shape for now."""
 
-    agent_type = "whatsapp"
+    agent_type = AgentType.WHATSAPP.value
 
     def execute(self, context: Mapping[str, Any]) -> ExecutionResult:
         self._check_inputs(context)
@@ -94,7 +95,7 @@ class WhatsAppExecutor(MessageExecutor):
         return ExecutionResult(
             agent_id=self.agent_id,
             agent_type=self.agent_type,
-            status="simulated",
+            status=ExecutorStatus.SIMULATED.value,
             actions=actions,
             rendered={"message": body},
             outputs={},

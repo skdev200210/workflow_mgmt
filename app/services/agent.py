@@ -4,7 +4,7 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.agent_types import metadata_model_for_type, update_model_for_type
+from app.services.agent_types import metadata_model_for_type, update_model_for_type
 from app.models.agent import Agent
 from app.schemas.agent import AgentUpdate
 

@@ -1,8 +1,10 @@
 import uuid
 from datetime import datetime
-from typing import Any, Literal
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
+
+from app.core.enums import CallbackOutcome, CallbackSource
 
 
 class CallbackPayload(BaseModel):
@@ -16,13 +18,13 @@ class CallbackPayload(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     agent_execution_id: uuid.UUID
-    source: Literal["calling", "whatsapp", "sms", "rcs"]
+    source: CallbackSource
     # Normalized outcome that drives the engine:
     #   success -> merge outputs, advance to the next node (through decisions)
     #   retry   -> re-schedule the SAME node (e.g. call not answered), bounded
     #              by max_attempts, delay from next_trigger_at or calling_config
     #   failure -> row + run marked failed
-    outcome: Literal["success", "retry", "failure"]
+    outcome: CallbackOutcome
     # Provider-specific detail, e.g. "no_answer", "busy", "undelivered".
     status: str | None = None
     # Captured output variables (e.g. {"ptp": true}) — merged into the context

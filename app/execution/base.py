@@ -6,6 +6,7 @@ from typing import Any, ClassVar
 
 from pydantic import BaseModel
 
+from app.core.enums import AgentType, ExecutorStatus
 from app.schemas.agent import extract_placeholders
 
 
@@ -20,7 +21,7 @@ class ExecutionResult:
 
     agent_id: uuid.UUID
     agent_type: str
-    status: str = "simulated"
+    status: str = ExecutorStatus.SIMULATED.value
     actions: list[str] = field(default_factory=list)
     rendered: dict[str, str] = field(default_factory=dict)
     outputs: dict[str, Any] = field(default_factory=dict)
@@ -34,7 +35,7 @@ class AgentExecutor(ABC):
     """
 
     # Set by concrete subclasses; used by the registry to route agent types.
-    agent_type: ClassVar[str]
+    agent_type: ClassVar[AgentType]
 
     def __init__(self, agent_id: uuid.UUID, metadata: BaseModel):
         self.agent_id = agent_id

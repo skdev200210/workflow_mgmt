@@ -21,6 +21,7 @@ from sqlalchemy import func, or_, select, update
 from app.core.config import get_settings
 from app.core.logging import setup_logging
 from app.db.session import AsyncSessionLocal
+from app.core.enums import AgentExecutionStatus, ExecutionStatus
 from app.execution.engine import dispatch_execution
 from app.models.execution import AgentExecution, WorkflowExecution
 
@@ -33,7 +34,7 @@ def _claim_stmt(batch: int):
     claimed = (
         select(WorkflowExecution.workflow_execution_id)
         .where(
-            WorkflowExecution.status == "pending",
+            WorkflowExecution.status == ExecutionStatus.PENDING.value,
             or_(
                 WorkflowExecution.next_trigger_at.is_(None),
                 WorkflowExecution.next_trigger_at <= func.now(),
@@ -49,7 +50,9 @@ def _claim_stmt(batch: int):
         .where(
             WorkflowExecution.workflow_execution_id == claimed.c.workflow_execution_id
         )
-        .values(status="processing", attempts=WorkflowExecution.attempts + 1)
+        .values(
+            status=ExecutionStatus.PROCESSING.value, attempts=WorkflowExecution.attempts + 1
+        )
         .returning(WorkflowExecution.workflow_execution_id)
     )
 
@@ -69,12 +72,12 @@ def _sweep_retry_stmt():
     return (
         update(WorkflowExecution)
         .where(
-            WorkflowExecution.status == "in_flight",
+            WorkflowExecution.status == ExecutionStatus.IN_FLIGHT.value,
             WorkflowExecution.last_triggered_at <= _timeout_cutoff(),
             WorkflowExecution.attempts < WorkflowExecution.max_attempts,
         )
         .values(
-            status="pending",
+            status=ExecutionStatus.PENDING.value,
             next_trigger_at=func.now(),
             error="callback timed out",
         )
@@ -86,12 +89,12 @@ def _sweep_dead_stmt():
     return (
         update(WorkflowExecution)
         .where(
-            WorkflowExecution.status == "in_flight",
+            WorkflowExecution.status == ExecutionStatus.IN_FLIGHT.value,
             WorkflowExecution.last_triggered_at <= _timeout_cutoff(),
             WorkflowExecution.attempts >= WorkflowExecution.max_attempts,
         )
         .values(
-            status="dead_letter",
+            status=ExecutionStatus.DEAD_LETTER.value,
             next_trigger_at=None,
             error="callback timed out; max attempts reached",
         )
@@ -103,10 +106,10 @@ def _sweep_receipts_stmt(execution_ids: list[uuid.UUID]):
     return (
         update(AgentExecution)
         .where(
-            AgentExecution.status == "dispatched",
+            AgentExecution.status == AgentExecutionStatus.DISPATCHED.value,
             AgentExecution.workflow_execution_id.in_(execution_ids),
         )
-        .values(status="timed_out")
+        .values(status=AgentExecutionStatus.TIMED_OUT.value)
     )
 
 
@@ -137,7 +140,7 @@ async def _dispatch_one(execution_id: uuid.UUID) -> None:
             async with AsyncSessionLocal() as db2:
                 ex = await db2.get(WorkflowExecution, execution_id)
                 if ex is not None:
-                    ex.status = "failed"
+                    ex.status = ExecutionStatus.FAILED.value
                     ex.error = str(exc)
                     await db2.commit()
 

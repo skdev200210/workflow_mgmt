@@ -8,6 +8,8 @@ operators allowed by ``app.schemas.workflow.Condition``.
 import logging
 from typing import Any
 
+from app.core.enums import ConditionOperator, MatchMode, NodeType
+
 logger = logging.getLogger(__name__)
 
 
@@ -30,7 +32,7 @@ class MissingParamError(Exception):
 def _num(x: Any) -> float | None:
     try:
         return float(x)
-    except TypeError, ValueError:
+    except (TypeError, ValueError):
         return None
 
 
@@ -55,22 +57,27 @@ def evaluate_condition(
         raise MissingParamError(param, context)
     actual = context[param]
 
-    if op in (">", "<", ">=", "<="):
+    if op in (
+        ConditionOperator.GT.value,
+        ConditionOperator.LT.value,
+        ConditionOperator.GTE.value,
+        ConditionOperator.LTE.value,
+    ):
         a, b = _num(actual), _num(expected)
         if a is None or b is None:
             return False
-        if op == ">":
+        if op == ConditionOperator.GT.value:
             return a > b
-        if op == "<":
+        if op == ConditionOperator.LT.value:
             return a < b
-        if op == ">=":
+        if op == ConditionOperator.GTE.value:
             return a >= b
         return a <= b
-    if op == "==":
+    if op == ConditionOperator.EQ.value:
         return actual == expected
-    if op == "!=":
+    if op == ConditionOperator.NEQ.value:
         return actual != expected
-    if op == "is":
+    if op == ConditionOperator.IS.value:
         return bool(actual) is bool(expected)
 
     logger.warning("unknown condition operator: %r", op)
@@ -88,7 +95,7 @@ def evaluate_conditions(
     if not conditions:
         return True
     results = [evaluate_condition(c, context) for c in conditions]
-    return all(results) if match == "all" else any(results)
+    return all(results) if match == MatchMode.ALL.value else any(results)
 
 
 def select_next_edge(
@@ -102,9 +109,9 @@ def select_next_edge(
       match; if several do we take the first and log a warning.
     Returns None when nothing matches (the branch ends here).
     """
-    if node.get("type") == "decision":
+    if node.get("type") == NodeType.DECISION.value:
         result = evaluate_conditions(
-            node.get("conditions"), node.get("match", "all"), context
+            node.get("conditions"), node.get("match", MatchMode.ALL.value), context
         )
         for edge in node.get("edges", []):
             if edge.get("branch") == result:

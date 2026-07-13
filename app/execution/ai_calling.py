@@ -1,6 +1,7 @@
 from collections.abc import Mapping
 from typing import Any
 
+from app.core.enums import AgentType, ExecutorStatus
 from app.execution.base import CallingExecutor, ExecutionResult
 
 
@@ -12,7 +13,7 @@ class AiCallingExecutor(CallingExecutor):
     same ``execute`` contract and place the actual call here.
     """
 
-    agent_type = "ai_calling"
+    agent_type = AgentType.AI_CALLING.value
 
     def execute(self, context: Mapping[str, Any]) -> ExecutionResult:
         self._check_inputs(context)
@@ -31,7 +32,7 @@ class AiCallingExecutor(CallingExecutor):
         return ExecutionResult(
             agent_id=self.agent_id,
             agent_type=self.agent_type,
-            status="simulated",
+            status=ExecutorStatus.SIMULATED.value,
             actions=actions,
             rendered={
                 "start_message": start,
@@ -51,7 +52,7 @@ class BlasterCallingExecutor(CallingExecutor):
     blast here.
     """
 
-    agent_type = "blaster_calling"
+    agent_type = AgentType.BLASTER_CALLING.value
 
     def execute(self, context: Mapping[str, Any]) -> ExecutionResult:
         self._check_inputs(context)
@@ -69,7 +70,7 @@ class BlasterCallingExecutor(CallingExecutor):
         return ExecutionResult(
             agent_id=self.agent_id,
             agent_type=self.agent_type,
-            status="simulated",
+            status=ExecutorStatus.SIMULATED.value,
             actions=actions,
             rendered={
                 "start_message": start,

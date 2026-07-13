@@ -10,6 +10,7 @@ from typing import Any
 
 from pydantic import BaseModel
 
+from app.core.enums import AgentCategory, AgentType
 from app.schemas.agent import (
     AiCallingMetadata,
     AiCallingMetadataUpdate,
@@ -74,33 +75,33 @@ MESSAGE_FIELDS: list[dict[str, Any]] = [
     },
 ]
 
-CATEGORIES: dict[str, dict[str, Any]] = {
-    "calling": {
+CATEGORIES: dict[AgentCategory, dict[str, Any]] = {
+    AgentCategory.CALLING: {
         "label": "Calling",
         "fields": CALLING_FIELDS,
         "metadata_model": AiCallingMetadata,
         "update_model": AiCallingMetadataUpdate,
         "types": [
-            {"key": "ai_calling", "label": "AI Calling Agent"},
-            {"key": "blaster_calling", "label": "Blaster Calling Agent"},
+            {"key": AgentType.AI_CALLING, "label": "AI Calling Agent"},
+            {"key": AgentType.BLASTER_CALLING, "label": "Blaster Calling Agent"},
         ],
     },
-    "message": {
+    AgentCategory.MESSAGE: {
         "label": "Message",
         "fields": MESSAGE_FIELDS,
         "metadata_model": MessageMetadata,
         "update_model": MessageMetadataUpdate,
         "types": [
-            {"key": "whatsapp", "label": "WhatsApp Message"},
-            {"key": "sms", "label": "SMS"},
-            {"key": "rcs", "label": "RCS Message"},
+            {"key": AgentType.WHATSAPP, "label": "WhatsApp Message"},
+            {"key": AgentType.SMS, "label": "SMS"},
+            {"key": AgentType.RCS, "label": "RCS Message"},
         ],
     },
 }
 
 
-def _type_to_category() -> dict[str, str]:
-    index: dict[str, str] = {}
+def _type_to_category() -> dict[AgentType, AgentCategory]:
+    index: dict[AgentType, AgentCategory] = {}
     for cat_key, cat in CATEGORIES.items():
         for t in cat["types"]:
             index[t["key"]] = cat_key
@@ -110,11 +111,11 @@ def _type_to_category() -> dict[str, str]:
 TYPE_TO_CATEGORY = _type_to_category()
 
 
-def known_types() -> set[str]:
+def known_types() -> set[AgentType]:
     return set(TYPE_TO_CATEGORY)
 
 
-def category_for_type(agent_type: str) -> str:
+def category_for_type(agent_type: str) -> AgentCategory:
     category = TYPE_TO_CATEGORY.get(agent_type)
     if category is None:
         raise ValueError(f"unknown agent_type: {agent_type!r}")

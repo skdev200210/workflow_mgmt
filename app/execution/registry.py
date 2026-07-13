@@ -1,6 +1,7 @@
 from typing import Any, Protocol
 
-from app.agent_types import metadata_model_for_type
+from app.services.agent_types import metadata_model_for_type
+from app.core.enums import AgentType
 from app.execution.ai_calling import AiCallingExecutor, BlasterCallingExecutor
 from app.execution.base import AgentExecutor
 from app.execution.message import (
@@ -18,7 +19,9 @@ _EXECUTORS: list[type[AgentExecutor]] = [
     RcsExecutor,
     WhatsAppExecutor,
 ]
-EXECUTOR_BY_TYPE: dict[str, type[AgentExecutor]] = {e.agent_type: e for e in _EXECUTORS}
+EXECUTOR_BY_TYPE: dict[AgentType, type[AgentExecutor]] = {
+    e.agent_type: e for e in _EXECUTORS
+}
 
 
 class _AgentLike(Protocol):

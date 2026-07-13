@@ -6,6 +6,8 @@ from typing import Annotated, Any, Literal, Union
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from app.core.enums import ConditionOperator, MatchMode, NodeType
+
 
 # --------------------------------------------------------------------------- #
 # Edge conditions
@@ -14,7 +16,7 @@ class Condition(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     param: str = Field(..., min_length=1)
-    op: Literal[">", "<", ">=", "<=", "==", "!=", "is"]
+    op: ConditionOperator
     # bool is listed first so JSON ``true``/``false`` stays a bool under
     # Pydantic v2's left-to-right union coercion (bool <-> int otherwise).
     value: bool | int | float | str
@@ -47,7 +49,7 @@ class ExecuteAgentConfig(BaseModel):
 class LeafNode(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    type: Literal["leaf_node"]
+    type: Literal[NodeType.LEAF]
     label: str
     node_config: dict[str, Any] = Field(default_factory=dict)
     input_data: str | None = None
@@ -57,7 +59,7 @@ class LeafNode(BaseModel):
 class ExecuteAgentNode(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    type: Literal["execute_agent"]
+    type: Literal[NodeType.EXECUTE_AGENT]
     label: str
     node_config: ExecuteAgentConfig
     input_data: str | None = None
@@ -79,10 +81,10 @@ class DecisionNode(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    type: Literal["decision"]
+    type: Literal[NodeType.DECISION]
     label: str
     node_config: dict[str, Any] = Field(default_factory=dict)
-    match: Literal["all", "any"] = "all"
+    match: MatchMode = MatchMode.ALL.value
     # Exactly ONE condition per decision — compound logic is expressed by
     # STACKING decision nodes, which also keeps every derived
     # stacked_conditions list flat.
@@ -159,7 +161,14 @@ def collect_agent_ids(definition: WorkflowDefinition) -> set[uuid.UUID]:
 # --------------------------------------------------------------------------- #
 # Stacked-condition derivation (backend-side; the frontend JSON is unchanged)
 # --------------------------------------------------------------------------- #
-_INVERT_OP = {">": "<=", "<": ">=", ">=": "<", "<=": ">", "==": "!=", "!=": "=="}
+_INVERT_OP = {
+    ConditionOperator.GT.value: ConditionOperator.LTE.value,
+    ConditionOperator.LT.value: ConditionOperator.GTE.value,
+    ConditionOperator.GTE.value: ConditionOperator.LT.value,
+    ConditionOperator.LTE.value: ConditionOperator.GT.value,
+    ConditionOperator.EQ.value: ConditionOperator.NEQ.value,
+    ConditionOperator.NEQ.value: ConditionOperator.EQ.value,
+}
 
 
 def _flat_condition(cond: dict[str, Any], *, invert: bool) -> dict[str, Any]:
@@ -168,7 +177,7 @@ def _flat_condition(cond: dict[str, Any], *, invert: bool) -> dict[str, Any]:
     op = cond["op"]
     value = cond["value"]
     if invert:
-        if op == "is":
+        if op == ConditionOperator.IS.value:
             value = not bool(value)
         else:
             op = _INVERT_OP[op]
@@ -178,18 +187,18 @@ def _flat_condition(cond: dict[str, Any], *, invert: bool) -> dict[str, Any]:
 def _branch_conditions(node: dict[str, Any], branch: bool) -> list[dict[str, Any]]:
     """The conditions implied by taking ``branch`` out of a decision node."""
     conds = node.get("conditions", [])
-    match = node.get("match", "all")
+    match = node.get("match", MatchMode.ALL.value)
     if len(conds) == 1:
         return [_flat_condition(conds[0], invert=not branch)]
     # Flat AND list is expressible for: True of an ALL group, False of an ANY
     # group (NOT(A OR B) == NOT A AND NOT B).
-    if (branch and match == "all") or (not branch and match == "any"):
+    if (branch and match == MatchMode.ALL.value) or (not branch and match == MatchMode.ANY.value):
         return [_flat_condition(c, invert=not branch) for c in conds]
     # True of an ANY group / False of an ALL group are OR-shaped — keep them as
     # one nested group instead of silently storing wrong semantics.
     return [
         {
-            "match": "any",
+            "match": MatchMode.ANY.value,
             "conditions": [_flat_condition(c, invert=not branch) for c in conds],
         }
     ]

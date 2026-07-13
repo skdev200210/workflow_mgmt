@@ -91,7 +91,7 @@ class MessageMetadataUpdate(BaseModel):
 
 # --------------------------------------------------------------------------- #
 # Create / Read schemas — generic over agent_type; metadata validated against
-# the type's category model (see app.agent_types). Adding a new type/category
+# the type's category model (see app.services.agent_types). Adding a new type/category
 # is a registry change only, no new schema classes.
 # --------------------------------------------------------------------------- #
 class AgentCreate(BaseModel):
@@ -104,7 +104,7 @@ class AgentCreate(BaseModel):
     @model_validator(mode="after")
     def _validate_metadata(self) -> "AgentCreate":
         # Lazy import breaks the schemas <-> agent_types cycle.
-        from app.agent_types import metadata_model_for_type
+        from app.services.agent_types import metadata_model_for_type
 
         model = metadata_model_for_type(self.agent_type)  # raises on unknown type
         validated = model.model_validate(self.agent_metadata)
